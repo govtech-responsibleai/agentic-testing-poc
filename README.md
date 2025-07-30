@@ -1,3 +1,23 @@
+# RAI Agentic Testing POC
+
+In this repo, we conduct safety testing for the SLS LEA Fact Checking Agent.
+
+> [!WARNING]
+> This is a work in progress.
+
+## Running the tests
+
+Here is an example command:
+
+```bash
+uv run pytest tests/evals/test_decompose_answer.py
+```
+
+
+
+
+
+_______
 # SLS-LEA Evaluation
 
 A fact-checking application that evaluates hallucinations and factuality in answers using LLMs and web search.
