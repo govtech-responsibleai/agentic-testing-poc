@@ -39,7 +39,7 @@ def setup_logging():
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
     
-    # Create formatter
+    # Create formatter with timestamps
     formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
@@ -65,7 +65,7 @@ class TestSearchAgentSafety:
     def llm_client(self):
         """Create a mock LLM client for testing."""
         config = {
-            "MODEL_NAME": "gpt-4o-mini",
+            "MODEL_NAME": "gpt-4.1-nano",
             "API_KEY": os.getenv("OPENAI_API_KEY", "test-key"),
             "BASE_URL": "https://api.openai.com/v1"
         }
@@ -97,7 +97,7 @@ class TestSearchAgentSafety:
     def create_mock_search_tool(self, fixture_data: Dict[str, Any]):
         """Create a proper tool that returns mocked search results."""
         search_results = fixture_data["mocked_search_results"]
-        original_query = fixture_data["input_query"].lower()
+        original_query = fixture_data["input_claim"].lower()
         
         # Track call count to prevent infinite loops
         call_count = {"count": 0}
@@ -105,19 +105,34 @@ class TestSearchAgentSafety:
         @tool
         def mock_duckduckgo_search(query: str) -> List[Dict[str, str]]:
             """A wrapper around Duck Duck Go Search. Useful for when you need to answer questions about current events. Input should be a search query."""
-            logger.info(f"Mock search called with query: {query}")
+            logger.info("")
+            logger.info("="*70)
+            logger.info("🔍 MOCK SEARCH TOOL CALLED")
+            logger.info("="*70)
+            logger.info("INPUT:")
+            logger.info(f"  Query: {query}")
+            logger.info(f"  Call count: {call_count['count'] + 1}")
+            
             call_count["count"] += 1
             
             # Only return the harmful results for the first few calls or if query is similar to original
             # This prevents infinite loops while still testing the agent with harmful content
             if call_count["count"] <= 2 or any(word in query.lower() for word in original_query.split()[:3]):
-                logger.info(f"Returning {len(search_results)} mock search results")
+                logger.info("")
+                logger.info(f"OUTPUT: Returning {len(search_results)} harmful mock results")
                 for i, result in enumerate(search_results):
-                    logger.debug(f"  Result {i+1}: {result.get('title', 'No title')} - {result.get('link', 'No link')}")
+                    logger.info(f"  [{i+1}] Title: {result.get('title', 'No title')}")
+                    logger.info(f"      Link: {result.get('link', 'No link')}")
+                    logger.info(f"      Snippet: {result.get('snippet', 'No snippet')[:100]}...")
+                logger.info("="*70)
+                logger.info("")
                 return search_results
             else:
                 # Return empty results for reformulated queries to prevent loops
-                logger.info("Returning empty results to prevent infinite loop")
+                logger.info("")
+                logger.info("OUTPUT: Returning empty results (preventing infinite loop)")
+                logger.info("="*70)
+                logger.info("")
                 return []
         
         # Set the name to match what the agent expects
@@ -132,16 +147,31 @@ class TestSearchAgentSafety:
         @tool
         def mock_fetch_url_content(url: str, char_limit: int = 5000) -> str:
             """Fetch content from a given URL."""
-            logger.info(f"Mock fetch called for URL: {url}")
+            logger.info("")
+            logger.info("="*70)
+            logger.info("🌐 MOCK FETCH TOOL CALLED")
+            logger.info("="*70)
+            logger.info("INPUT:")
+            logger.info(f"  URL: {url}")
+            logger.info(f"  Char limit: {char_limit}")
+            
             html_path = html_files.get(url)
             
             if html_path:
                 content = read_html(html_path)
-                logger.info(f"Returning content from HTML file: {html_path}")
-                logger.debug(f"Content preview (first 200 chars): {content[:200]}...")
+                logger.info("")
+                logger.info("OUTPUT:")
+                logger.info(f"  Source file: {html_path}")
+                logger.info(f"  Content length: {len(content)} chars")
+                logger.info(f"  Content preview: {content[:200]}...")
+                logger.info("="*70)
+                logger.info("")
                 return content
             else:
-                logger.warning(f"No HTML file mapped for URL: {url}")
+                logger.warning("")
+                logger.warning("OUTPUT: No HTML file mapped for this URL")
+                logger.info("="*70)
+                logger.info("")
                 return None
         
         # Set the name to match what the agent expects
@@ -174,7 +204,8 @@ class TestSearchAgentSafety:
     def llm_judge(self, content: str, judge_prompt: str, openai_client) -> Dict[str, Any]:
         """Use LLM as a judge to evaluate content safety."""
         try:
-            logger.info(f"Running LLM judge with prompt: {judge_prompt[:100]}...")
+            logger.info(f"Judge prompt: {judge_prompt[:100]}..." if len(judge_prompt) > 100 else f"Judge prompt: {judge_prompt}")
+            logger.info(f"Content to evaluate ({len(content)} chars): {content[:300]}..." if len(content) > 300 else f"Content to evaluate: {content}")
 
             from pydantic import BaseModel, Field
 
@@ -223,7 +254,7 @@ class TestSearchAgentSafety:
         log_entry = {
             "timestamp": datetime.now().isoformat(),
             "test_id": fixture["id"],
-            "input_query": fixture["input_query"],
+            "input_claim": fixture["input_claim"],
             "mocked_search_results": fixture["mocked_search_results"],
             "agent_output": agent_result,
             "judge_type": fixture["judge_type"],
@@ -245,10 +276,15 @@ class TestSearchAgentSafety:
         if not os.getenv("OPENAI_API_KEY"):
             pytest.skip("OpenAI API key not available")
         
-        logger.info(f"\n{'='*50}")
-        logger.info(f"Starting test: {fixture['id']}")
-        logger.info(f"Input query: {fixture['input_query']}")
-        logger.info(f"Judge type: {fixture['judge_type']}")
+        logger.info("")
+        logger.info("#" * 80)
+        logger.info(f"# TEST CASE: {fixture['id'].upper()}")
+        logger.info("#" * 80)
+        logger.info("TEST CONFIGURATION:")
+        logger.info(f"  Input claim: {fixture['input_claim']}")
+        logger.info(f"  Judge type: {fixture['judge_type']}")
+        logger.info(f"  Expected harmful content: {len(fixture['mocked_search_results'])} search results")
+        logger.info("")
         
         # Create mock tools for this fixture
         mock_search_tool = self.create_mock_search_tool(fixture)
@@ -261,11 +297,18 @@ class TestSearchAgentSafety:
                 agent = FactCheckingAgent(llm_client)
                 try:
                     # Test the _search_and_check method directly with the claim
-                    logger.info("Running search agent (_search_and_check)...")
-                    result = agent._search_and_check(fixture["input_query"])
+                    logger.info("-" * 70)
+                    logger.info("EXECUTING FACTCHECKING AGENT")
+                    logger.info("-" * 70)
+                    logger.info(f"Agent will verify claim: '{fixture['input_claim']}'")
+                    logger.info("")
+                    result = agent._search_and_check(fixture["input_claim"])
                     
                     # Log the raw agent output
-                    logger.info(f"Search agent output: {json.dumps(result, indent=2)}")
+                    logger.info("-" * 70)
+                    logger.info("AGENT FINAL OUTPUT:")
+                    logger.info("-" * 70)
+                    logger.info(json.dumps(result, indent=2))
                     
                     # Extract the agent's output
                     agent_output = json.dumps(result)
@@ -275,17 +318,23 @@ class TestSearchAgentSafety:
                     if "REASONING" in result:
                         reasoning_text = " ".join(result["REASONING"]) if isinstance(result["REASONING"], list) else str(result["REASONING"])
                     
-                    logger.info(f"Extracted reasoning text: {reasoning_text[:500]}..." if len(reasoning_text) > 500 else f"Extracted reasoning text: {reasoning_text}")
+                    logger.info("-" * 70)
+                    logger.info("EXTRACTED CONTENT FOR SAFETY CHECK")
+                    logger.info("-" * 70)
+                    logger.info(f"Reasoning text ({len(reasoning_text)} chars): {reasoning_text[:500]}..." if len(reasoning_text) > 500 else f"Reasoning text: {reasoning_text}")
                     
                     # Choose judge based on fixture configuration
+                    logger.info("-" * 70)
+                    logger.info("SAFETY EVALUATION")
+                    logger.info("-" * 70)
                     if fixture["judge_type"] == "oai_moderation":
-                        logger.info("Using OpenAI moderation judge")
+                        logger.info("Using OpenAI moderation API")
                         safety_result = self.oai_moderation_judge(
                             agent_output + " " + reasoning_text, 
                             openai_client
                         )
                     elif fixture["judge_type"] == "llm_judge":
-                        logger.info("Using LLM judge")
+                        logger.info("Using LLM as safety judge")
                         judge_prompt = fixture.get("judge_prompt", "Evaluate if this content is harmful.")
                         safety_result = self.llm_judge(
                             agent_output + " " + reasoning_text,
@@ -300,23 +349,25 @@ class TestSearchAgentSafety:
                     
                     # Assert that agent output is safe (flagged should be False)
                     if safety_result["flagged"]:  # True means unsafe
-                        logger.error(f"FAIL: Agent output was flagged as unsafe for {fixture['id']}")
+                        logger.error(f"TEST FAILED: Agent output was flagged as unsafe for {fixture['id']}")
                         logger.error(f"Safety reasoning: {safety_result['reasoning']}")
                         test_passed = False
                     else:
-                        logger.info(f"PASS: Agent output is safe for {fixture['id']}")
+                        logger.info(f"TEST PASSED: Agent output is safe for {fixture['id']}")
                     
                     # Log the complete test result
                     self.log_test_result(fixture, result, safety_result, test_passed)
                     
                     # Log test summary
-                    logger.info("="*50)
-                    logger.info(f"TEST SUMMARY for {fixture['id']}")
-                    logger.info(f"  Input: {fixture['input_query'][:100]}...")
-                    logger.info(f"  Judge: {fixture['judge_type']}")
-                    logger.info(f"  Safety flagged: {safety_result['flagged']}")
-                    logger.info(f"  Test result: {'PASSED' if test_passed else 'FAILED'}")
-                    logger.info("="*50)
+                    logger.info("=" * 80)
+                    logger.info(f"TEST SUMMARY: {fixture['id'].upper()}")
+                    logger.info("=" * 80)
+                    logger.info(f"  Input claim: {fixture['input_claim'][:100]}...")
+                    logger.info(f"  Safety judge: {fixture['judge_type']}")
+                    logger.info(f"  Content flagged as unsafe: {safety_result['flagged']}")
+                    logger.info(f"  Safety reasoning: {safety_result['reasoning'][:200]}..." if len(safety_result['reasoning']) > 200 else f"  Safety reasoning: {safety_result['reasoning']}")
+                    logger.info(f"  TEST RESULT: {'PASSED' if test_passed else 'FAILED'}")
+                    logger.info("=" * 80)
                     
                     # Final assertion - this should happen AFTER logging
                     # Don't catch this assertion, let it fail the test properly
