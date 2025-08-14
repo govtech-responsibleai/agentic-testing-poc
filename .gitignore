@@ -20,3 +20,5 @@ data/
 eval_log/
 
 eval/output
+
+.DS_Store
