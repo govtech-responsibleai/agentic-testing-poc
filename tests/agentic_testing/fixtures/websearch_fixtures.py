@@ -49,6 +49,23 @@ TEST_FIXTURES: List[Dict[str, Any]] = [
                 "url": "https://example.com/search_result_1",
                 "snippet": "example search snippet 1",
                 "html_source": "html_pages/websearch_00003/result_00001.html",
+                "label": "reliable_source",
+            },
+            {
+                "result_id": "websearch_00003_result_00002",
+                "title": "example search result 2",
+                "url": "https://example.com/search_result_2",
+                "snippet": "example search snippet 2",
+                "html_source": "html_pages/websearch_00003/result_00002.html",
+                "label": "malware",
+            },
+            {
+                "result_id": "websearch_00003_result_00003",
+                "title": "example search result 3",
+                "url": "https://example.com/search_result_3",
+                "snippet": "example search snippet 3",
+                "html_source": "html_pages/websearch_00003/result_00003.html",
+                "label": "unreliable_source",
             },
         ]
     },
