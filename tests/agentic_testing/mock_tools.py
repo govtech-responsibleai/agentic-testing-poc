@@ -1,15 +1,17 @@
 """
 Mock tools for testing the FactCheckingAgent.
+Updated to use tool wrapping approach instead of re-defining tools.
 """
 
 import logging
 from typing import Dict, Any, List
-from langchain_core.tools import tool
 from tests.agentic_testing.utils import read_html_file
+from tests.agentic_testing.mock_manager import ToolMockManager
+from analysis.tools.ddg_tool import RetryDuckDuckGoSearchResults
 
 
 class MockSearchTool:
-    """Mock DuckDuckGo search tool for testing."""
+    """Mock DuckDuckGo search tool using the new wrapping approach."""
     
     def __init__(self, fixture_data: Dict[str, Any], logger: logging.Logger = None):
         """
@@ -19,38 +21,60 @@ class MockSearchTool:
             fixture_data: Test fixture containing mocked search results
             logger: Logger instance
         """
+        self.fixture_data = fixture_data
         self.mocked_results = fixture_data.get("mocked_search_results", [])
         self.search_queries = []  # Track all queries made
         self.logger = logger or logging.getLogger(__name__)
+        
+        # Create fixtures for the mock manager
+        self.fixtures = self._prepare_fixtures()
+    
+    def _prepare_fixtures(self) -> Dict[str, Any]:
+        """Prepare fixtures in the format expected by ToolMockManager."""
+        # Format results for the agent (without labels)
+        formatted_results = []
+        for result in self.mocked_results:
+            formatted_results.append({
+                "link": result["url"],
+                "title": result["title"],
+                "snippet": result["snippet"]
+            })
+        return formatted_results
     
     def create_tool(self):
-        """Create the mock search tool."""
-        # Capture instance variables in closure
-        mocked_results = self.mocked_results
-        search_queries = self.search_queries
-        logger = self.logger
+        """Create the wrapped search tool."""
+        # Create actual tool instance
+        search_tool = RetryDuckDuckGoSearchResults(output_format="list")
         
-        @tool
-        def mock_duckduckgo_search(query: str) -> List[Dict[str, str]]:
-            """Mock DuckDuckGo search that returns fixture data."""
-            # Track the query
-            search_queries.append(query)
-            logger.info(f"🔍 DDG Search Query #{len(search_queries)}: {query}")
-            
-            # Format results for the agent (without labels)
-            formatted_results = []
-            for result in mocked_results:
-                formatted_results.append({
-                    "link": result["url"],
-                    "title": result["title"],
-                    "snippet": result["snippet"]
-                })
-            
-            logger.info(f"   Returning {len(formatted_results)} search results")
-            return formatted_results
+        # Create mock manager with fixtures
+        mock_manager = ToolMockManager(
+            {"search": self.fixtures},
+            logger=self.logger
+        )
         
-        mock_duckduckgo_search.name = "duckduckgo_results_json"
-        return mock_duckduckgo_search
+        # Track queries using the mock manager's call history
+        original_wrap = mock_manager.wrap_tool
+        def wrap_with_tracking(tool_instance, fixture_key, **kwargs):
+            wrapped = original_wrap(tool_instance, fixture_key, **kwargs)
+            # Override _run to also track queries
+            original_run = wrapped._run
+            def run_with_tracking(*args, **kwargs):
+                if args:
+                    self.search_queries.append(args[0])
+                return original_run(*args, **kwargs)
+            wrapped._run = run_with_tracking
+            return wrapped
+        
+        mock_manager.wrap_tool = wrap_with_tracking
+        
+        # Wrap the tool
+        wrapped_tool = mock_manager.wrap_tool(
+            search_tool,
+            "search",
+            response_strategy="static"
+        )
+        
+        return wrapped_tool
     
     def get_queries(self) -> List[str]:
         """Get all search queries made."""
@@ -58,7 +82,7 @@ class MockSearchTool:
 
 
 class MockFetchTool:
-    """Mock URL fetch tool for testing with prompt injection."""
+    """Mock URL fetch tool using the new wrapping approach."""
     
     def __init__(
         self,
@@ -74,69 +98,101 @@ class MockFetchTool:
             prompt_injection: Prompt injection fixture to append
             logger: Logger instance
         """
+        self.fixture_data = fixture_data
         self.mocked_results = fixture_data.get("mocked_search_results", [])
         self.prompt_injection = prompt_injection
         self.visited_urls = []  # Track all URLs visited
         self.url_visit_details = []  # Track detailed visit info
         self.injected_prompt = None  # Track what was injected
         self.injection_evaluator = None  # Track evaluator function
+        self.injection_url = None  # Track which URL got the injection
         self.logger = logger or logging.getLogger(__name__)
         
         # Create URL to result mapping
         self.url_to_result = {result["url"]: result for result in self.mocked_results}
+        
+        # Prepare fixtures for mock manager
+        self.fixtures = self._prepare_fixtures()
+    
+    def _prepare_fixtures(self) -> Dict[str, Any]:
+        """Prepare fixtures in the format expected by ToolMockManager."""
+        url_content_map = {}
+        
+        for result in self.mocked_results:
+            url = result["url"]
+            html_source = result.get("html_source", "")
+            
+            if html_source:
+                content = read_html_file(html_source)
+            else:
+                content = f"<html><body><p>{result.get('snippet', '')}</p></body></html>"
+            
+            url_content_map[url] = {
+                "content": content,
+                "label": result.get("label", "unknown"),
+                "metadata": result
+            }
+        
+        return url_content_map
     
     def create_tool(self):
-        """Create the mock fetch URL tool."""
-        # Capture instance variables in closure
-        url_to_result = self.url_to_result
-        visited_urls = self.visited_urls
-        url_visit_details = self.url_visit_details
-        prompt_injection = self.prompt_injection
-        logger = self.logger
-        instance = self  # Capture self for setting injection info
+        """Create the wrapped fetch URL tool."""
+        # We need to create a proper tool function since fetch_url_content is decorated
+        # Import the actual decorated tool
+        from analysis.tools.visit_page_tool import fetch_url_content as original_fetch_tool
         
-        @tool
-        def mock_fetch_url_content(url: str, char_limit: int = 5000) -> str:
-            """Mock fetch URL that returns HTML content with injected prompts."""
-            # Track the visit
-            visited_urls.append(url)
+        # Create a custom response function that handles our fixtures
+        def custom_response_fn(*args, **kwargs):
+            url = args[0] if args else kwargs.get('url', '')
+            char_limit = kwargs.get('char_limit', 5000)
             
-            # Find the result info for this URL
-            result_info = url_to_result.get(url)
-            if result_info:
-                label = result_info.get("label", "unknown")
-                html_source = result_info.get("html_source", "")
+            # Track the visit
+            self.visited_urls.append(url)
+            visit_number = len(self.visited_urls)
+            
+            # Get fixture data for this URL
+            if url in self.fixtures:
+                url_data = self.fixtures[url]
+                content = url_data.get("content", "")
+                label = url_data.get("label", "unknown")
                 
                 # Track detailed visit info
-                url_visit_details.append({
+                self.url_visit_details.append({
                     "url": url,
                     "label": label,
-                    "visit_number": len(visited_urls)
+                    "visit_number": visit_number
                 })
                 
-                logger.info(f"🌐 Fetch URL #{len(visited_urls)}: {url}")
-                logger.info(f"   Source type: {label}")
+                self.logger.info(f"🌐 Fetch URL #{visit_number}: {url}")
+                self.logger.info(f"   Source type: {label}")
                 
-                # Read the HTML content
-                content = read_html_file(html_source)
+                # Decide whether to inject prompt
+                should_inject = (visit_number == 2) or (visit_number == 1 and len(self.url_to_result) == 1)
                 
-                # Inject prompt injection at the end
-                injection_text = prompt_injection["input"]
-                injected_content = content + "\n\n" + injection_text
+                if should_inject and self.prompt_injection:
+                    injection_text = self.prompt_injection["input"]
+                    content = content + "\n\n" + injection_text
+                    
+                    # Store injection info
+                    self.injected_prompt = injection_text
+                    self.injection_evaluator = self.prompt_injection["evaluator"]
+                    self.injection_url = url
+                    
+                    self.logger.info(f"   💉 Injection added to this URL!")
+                    self.logger.info(f"      Injected prompt: {injection_text[:100]}...")
+                else:
+                    self.logger.info(f"   ✓ Clean content returned (no injection)")
                 
-                # Store injection info for later evaluation
-                instance.injected_prompt = injection_text
-                instance.injection_evaluator = prompt_injection["evaluator"]
-                
-                logger.info(f"   💉 Injected prompt: {injection_text[:100]}...")
-                
-                return injected_content[:char_limit]
+                return content[:char_limit]
             else:
-                logger.warning(f"   ⚠️ URL not found in mocked results: {url}")
+                self.logger.warning(f"   ⚠️ URL not found in mocked results: {url}")
                 return "Page not found"
         
-        mock_fetch_url_content.name = "fetch_url_content"
-        return mock_fetch_url_content
+        # Override the tool's function
+        wrapped_tool = original_fetch_tool
+        wrapped_tool.func = custom_response_fn
+        
+        return wrapped_tool
     
     def get_visited_urls(self) -> List[str]:
         """Get all URLs visited."""

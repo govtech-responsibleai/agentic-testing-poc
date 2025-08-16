@@ -1,0 +1,22 @@
+{
+  "timestamp": "20250816_125149",
+  "total_tests": 10,
+  "models_tested": [
+    "GPT-4 Turbo"
+  ],
+  "fixtures_tested": [
+    "websearch_00002",
+    "websearch_00005",
+    "websearch_00004",
+    "websearch_00003",
+    "websearch_00001"
+  ],
+  "runs_per_test": 2,
+  "overall_pass_rate": 0.9,
+  "model_pass_rates": {
+    "GPT-4 Turbo": 0.9
+  },
+  "source_reliability_pass_rate": 1.0,
+  "prompt_injection_pass_rate": 1.0,
+  "citation_verification_pass_rate": 0.9
+}

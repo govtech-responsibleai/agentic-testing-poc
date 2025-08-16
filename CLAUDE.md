@@ -29,6 +29,9 @@ source .venv/bin/activate && uv run pytest tests/evals/test_decompose_answer_saf
 
 # Run single test
 source .venv/bin/activate && uv run pytest tests/evals/test_decompose_answer.py::test_decompose_answer_correct_number_of_claims -v
+
+# Run agentic tests for web search safety
+source .venv/bin/activate && uv run pytest tests/agentic_testing/test_websearch_agent.py -v -s
 ```
 
 ### Running the Application
@@ -59,11 +62,29 @@ Safety test files created:
 - `tests/evals/test_decompose_answer_safety_simple.py`: Simplified version for quick testing
 - `tests/evals/SAFETY_TEST_FINDINGS.md`: Detailed findings and recommendations
 
+### Agentic Testing Framework (`tests/agentic_testing/`)
+
+Comprehensive framework for testing the FactCheckingAgent's web search functionality with focus on safety and reliability. The framework uses mock tools to simulate external dependencies and evaluates agent behavior across multiple safety metrics.
+
+**Key Components:**
+- **Test Suite** (`test_websearch_agent.py`): Parameterized tests for the `_search_and_check` method
+- **Evaluators** (`evaluators.py`): 
+  - `QueryQualityEvaluator`: Compares agent queries with golden queries using embeddings
+  - `SourceReliabilityEvaluator`: Detects visits to malware/unreliable sources
+  - `PromptInjectionEvaluator`: Tests resistance to prompt injections in web content
+  - `CitationVerificationEvaluator`: Ensures no hallucinated citations
+- **Mock Tools** (`mock_tools.py`): Simulates DuckDuckGo search and URL fetching with controlled responses
+- **Mock Manager** (`mock_manager.py`): Advanced tool mocking that preserves signatures and tracks calls
+- **Test Fixtures** (`fixtures/websearch_fixtures.py`): Predefined test cases with various source types
+
 ### Test Categories
 
 1. **Hallucination Detection**: Ensures decomposition doesn't add claims not in original answer
 2. **Unsafe Input Handling**: Tests prompt injections, SQL injection patterns, Unicode exploits
 3. **Hybrid Evaluation**: Uses ROUGE scoring + LLM judge + semantic similarity
+4. **Web Search Safety**: Tests agent's behavior when interacting with external web sources
+5. **Source Reliability**: Ensures agent avoids malicious/unreliable sources
+6. **Prompt Injection Resistance**: Validates agent isn't compromised by malicious web content
 
 ### API Endpoints
 
@@ -81,8 +102,26 @@ When adding safety tests:
 4. Verify no information is added during decomposition
 5. Use hybrid evaluation approach for robust verification
 
+## Agentic Testing Configuration
+
+**Mock Tools Approach**: The framework uses a tool wrapping approach that:
+- Preserves original tool signatures for compatibility
+- Intercepts tool calls to return fixture data
+- Tracks all tool interactions for analysis
+- Supports injection of malicious content for safety testing
+
+**API Requirements**: 
+- OpenAI API key required for QueryQualityEvaluator (uses embeddings)
+- Tests use mock tools to avoid actual web requests
+- Fixtures provide controlled, repeatable test scenarios
+
 ## Known Issues
 
 1. **Prompt Injection Vulnerability**: System doesn't filter injection attempts in decomposition
 2. **Authentication Errors**: May occur with LLM judge in tests - check API credentials
 3. **Long Test Execution**: Some tests may timeout due to multiple LLM calls
+
+## Recent Updates
+
+- **Agentic Testing Refactor**: Mock tools updated to use wrapping approach (preserves tool signatures)
+- **Mock Manager**: New `ToolMockManager` class provides advanced mocking capabilities

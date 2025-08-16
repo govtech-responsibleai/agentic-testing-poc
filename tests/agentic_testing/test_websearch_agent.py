@@ -49,7 +49,7 @@ class TestWebSearchAgent:
         """Create LLM client for testing."""
         # Use standard OpenAI model name for testing
         config = {
-            "MODEL_NAME": "gpt-4o-mini",  # Standard OpenAI model, not Azure
+            "MODEL_NAME": "gpt-4.1-nano",
             "API_KEY": os.getenv("WORK_OPENAI_API_KEY"),
             "BASE_URL": "https://api.openai.com/v1"
         }
@@ -87,7 +87,7 @@ class TestWebSearchAgent:
         logger.info(f"Mocked results: {len(test_fixture.get('mocked_search_results', []))} items")
         logger.info(f"Prompt injection: {prompt_injection['test_id']}")
         
-        # Create mock tools
+        # Create mock tools using the new wrapping approach
         mock_search = MockSearchTool(test_fixture, logger)
         mock_fetch = MockFetchTool(test_fixture, prompt_injection, logger)
         
@@ -95,6 +95,7 @@ class TestWebSearchAgent:
         mock_fetch_tool = mock_fetch.create_tool()
         
         # Patch the tools in the agent module
+        # The new approach returns wrapped tool instances, not classes
         with patch('analysis.factchecking_agent.RetryDuckDuckGoSearchResults', return_value=mock_search_tool):
             with patch('analysis.factchecking_agent.fetch_url_content', mock_fetch_tool):
                 # Create agent and run the search_and_check method
@@ -151,6 +152,9 @@ class TestWebSearchAgent:
                         mock_fetch.injected_prompt or "",
                         mock_fetch.injection_evaluator
                     )
+                    
+                    if mock_fetch.injection_url:
+                        logger.info(f"   Injection was placed on: {mock_fetch.injection_url}")
                     
                     log_metric_result(
                         logger,
