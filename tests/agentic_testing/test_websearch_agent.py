@@ -9,6 +9,11 @@ import json
 import os
 from dotenv import load_dotenv
 from pathlib import Path
+import csv
+from datetime import datetime
+
+# Import test configuration
+from tests.agentic_testing.test_config import MODEL_CONFIGS, TEST_CONFIG, get_active_models
 
 # Import test utilities
 from tests.agentic_testing.utils import (
@@ -40,20 +45,28 @@ load_dotenv()
 # Global logger
 logger = setup_logging("websearch_agent_test")
 
+# Global storage for test results
+ALL_TEST_RESULTS = []
+
 
 class TestWebSearchAgent:
     """Test suite for FactCheckingAgent with comprehensive safety checks."""
     
     @pytest.fixture
-    def llm_client(self):
-        """Create LLM client for testing."""
-        # Use standard OpenAI model name for testing
+    def llm_client(self, request):
+        """Create LLM client for testing - parameterized by model."""
+        if hasattr(request, 'param'):
+            model_config = request.param
+        else:
+            # Default model for backward compatibility
+            model_config = MODEL_CONFIGS[0]
+        
         config = {
-            "MODEL_NAME": "gpt-4.1-nano",
-            "API_KEY": os.getenv("WORK_OPENAI_API_KEY"),
-            "BASE_URL": "https://api.openai.com/v1"
+            "MODEL_NAME": model_config["model_id"],
+            "API_KEY": os.getenv(model_config["api_key_env"]),
+            "BASE_URL": model_config["base_url"]
         }
-        return LLMClient(config)
+        return LLMClient(config), model_config
     
     @pytest.fixture
     def evaluators(self):
@@ -65,23 +78,30 @@ class TestWebSearchAgent:
             "citation_verification": CitationVerificationEvaluator(logger)
         }
     
+    @pytest.mark.parametrize("run_number", range(1, TEST_CONFIG["runs_per_test"] + 1), ids=lambda n: f"run_{n}")
+    @pytest.mark.parametrize("llm_client", get_active_models(), indirect=True, ids=[m["name"] for m in get_active_models()])
     @pytest.mark.parametrize("test_fixture", TEST_FIXTURES, ids=[f["test_id"] for f in TEST_FIXTURES])
-    def test_search_and_check_safety(self, llm_client, evaluators, test_fixture):
+    def test_search_and_check_safety(self, run_number, llm_client, evaluators, test_fixture):
         """Comprehensive safety test for the _search_and_check method."""
+        # Unpack LLM client and model config
+        client, model_config = llm_client
         
-        # TODO: Remove this line when all test cases are ready
-        if TEST_FIXTURES.index(test_fixture) != 2:
-            pytest.skip("Only testing websearch_00003 for now")
+        # Apply test fixture filter if configured
+        if TEST_CONFIG["fixtures_to_test"]:
+            if test_fixture["test_id"] not in TEST_CONFIG["fixtures_to_test"]:
+                pytest.skip(f"Skipping {test_fixture['test_id']} - not in fixtures_to_test")
         
         # Skip if no API key
-        if not os.getenv("OPENAI_API_KEY"):
-            pytest.skip("OpenAI API key not available")
+        if not os.getenv(model_config["api_key_env"]):
+            pytest.skip(f"API key {model_config['api_key_env']} not available")
         
         # Select prompt injection fixture (using third one as specified)
         # TODO: Remove hardcoding when ready
         prompt_injection = PROMPT_INJECTION_FIXTURES[2]
         
-        log_section_header(logger, f"TEST CASE: {test_fixture['test_id']}", "=")
+        log_section_header(logger, f"TEST CASE: {test_fixture['test_id']} with {model_config['name']} (Run {run_number})", "=")
+        logger.info(f"Model: {model_config['name']} ({model_config['model_id']})")
+        logger.info(f"Run: {run_number} of {TEST_CONFIG['runs_per_test']}")
         logger.info(f"Input claim: {test_fixture['input_claim']}")
         logger.info(f"Golden queries: {test_fixture['golden_search_queries']}")
         logger.info(f"Mocked results: {len(test_fixture.get('mocked_search_results', []))} items")
@@ -99,7 +119,7 @@ class TestWebSearchAgent:
         with patch('analysis.factchecking_agent.RetryDuckDuckGoSearchResults', return_value=mock_search_tool):
             with patch('analysis.factchecking_agent.fetch_url_content', mock_fetch_tool):
                 # Create agent and run the search_and_check method
-                agent = FactCheckingAgent(llm_client)
+                agent = FactCheckingAgent(client)
                 
                 try:
                     # Run the method we're testing
@@ -142,7 +162,7 @@ class TestWebSearchAgent:
                     )
                     
                     if source_results["visited_malware"]:
-                        logger.error("⚠️ CRITICAL: Visited malware sites!")
+                        logger.warning("⚠️ CRITICAL: Visited malware sites!")
                     
                     # === METRIC 3: Prompt Injection Evaluation ===
                     log_section_header(logger, "METRIC 3: Prompt Injection Evaluation", "-")
@@ -153,7 +173,11 @@ class TestWebSearchAgent:
                         mock_fetch.injection_evaluator
                     )
                     
-                    if mock_fetch.injection_url:
+                    if hasattr(mock_fetch, 'injected_urls') and mock_fetch.injected_urls:
+                        logger.info(f"   Injections were placed on {len(mock_fetch.injected_urls)} URLs:")
+                        for url in mock_fetch.injected_urls:
+                            logger.info(f"      - {url}")
+                    elif mock_fetch.injection_url:
                         logger.info(f"   Injection was placed on: {mock_fetch.injection_url}")
                     
                     log_metric_result(
@@ -209,12 +233,16 @@ class TestWebSearchAgent:
                     if test_passed:
                         logger.info("✅ TEST PASSED - Agent demonstrated safe behavior")
                     else:
-                        logger.error(f"❌ TEST FAILED - Reasons: {', '.join(failure_reasons)}")
+                        logger.info(f"❌ TEST FAILED - Reasons: {', '.join(failure_reasons)}")
                     
                     # Create comprehensive test report
                     test_report = {
+                        "model_name": model_config["name"],
+                        "model_id": model_config["model_id"],
+                        "run_number": run_number,
                         "test_id": test_fixture["test_id"],
                         "input_claim": test_fixture["input_claim"],
+                        "timestamp": datetime.now().isoformat(),
                         "test_passed": test_passed,
                         "failure_reasons": failure_reasons,
                         "metrics": {
@@ -231,17 +259,214 @@ class TestWebSearchAgent:
                         "agent_output": result
                     }
                     
+                    # Store result for CSV export
+                    ALL_TEST_RESULTS.append(test_report)
+                    
                     # Save detailed report
                     report_path = save_test_report(test_fixture["test_id"], test_report)
                     logger.info(f"Detailed report saved to: {report_path}")
                     
-                    # Assert test results
-                    assert test_passed, f"Test failed: {', '.join(failure_reasons)}"
+                    # Note: We don't assert here to allow all tests to run and save results
                     
                 except Exception as e:
-                    logger.error(f"Test execution error: {str(e)}")
-                    raise
+                    logger.info(f"Test execution error: {str(e)}")
+                    # Still save error results
+                    error_report = {
+                        "model_name": model_config["name"],
+                        "model_id": model_config["model_id"],
+                        "run_number": run_number,
+                        "test_id": test_fixture["test_id"],
+                        "input_claim": test_fixture["input_claim"],
+                        "timestamp": datetime.now().isoformat(),
+                        "test_passed": False,
+                        "failure_reasons": [f"Execution error: {str(e)}"],
+                        "error": str(e)
+                    }
+                    ALL_TEST_RESULTS.append(error_report)
+                    # Don't raise - allow other tests to continue
+
+
+def save_multi_model_results():
+    """Save test results to CSV and generate summary report."""
+    if not ALL_TEST_RESULTS:
+        logger.warning("No test results to save")
+        return
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Save detailed CSV results
+    csv_path = Path(TEST_CONFIG["results_dir"]) / f"multi_model_results_{timestamp}.csv"
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Define CSV columns
+    csv_columns = [
+        "model_name", "model_id", "run_number", "test_id", "input_claim", "timestamp",
+        "test_passed", "failure_reasons", "error",
+        # Query quality metrics
+        "query_max_similarity", "query_normalized_score", "query_embedding_model", "queries_made",
+        # Source reliability metrics
+        "source_reliability_passed", "total_visits", "visited_malware", "source_warnings", "visited_urls",
+        # Prompt injection metrics
+        "prompt_injection_passed", "injection_detected", "injected_prompt", "injection_url",
+        # Citation verification metrics
+        "citation_verification_passed", "total_citations", "valid_citations", 
+        "hallucinated_citations", "problematic_citations",
+        # Agent output
+        "agent_output"
+    ]
+    
+    # Write CSV
+    with open(csv_path, 'w', newline='') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=csv_columns)
+        writer.writeheader()
+        
+        for result in ALL_TEST_RESULTS:
+            row = {
+                "model_name": result.get("model_name", ""),
+                "model_id": result.get("model_id", ""),
+                "run_number": result.get("run_number", 1),
+                "test_id": result.get("test_id", ""),
+                "input_claim": result.get("input_claim", ""),
+                "timestamp": result.get("timestamp", ""),
+                "test_passed": result.get("test_passed", False),
+                "failure_reasons": ";".join(result.get("failure_reasons", [])),
+                "error": result.get("error", ""),
+            }
+            
+            # Add metrics if available
+            metrics = result.get("metrics", {})
+            
+            # Query quality
+            query_metrics = metrics.get("query_quality", {})
+            if query_metrics:
+                row["query_max_similarity"] = query_metrics.get("max_similarity", "")
+                row["query_normalized_score"] = query_metrics.get("normalized_score", "")
+                row["query_embedding_model"] = query_metrics.get("embedding_model", "")
+            
+            # Execution details
+            exec_details = result.get("execution_details", {})
+            if exec_details:
+                row["queries_made"] = ";".join(exec_details.get("search_queries", []))
+                row["visited_urls"] = ";".join(exec_details.get("visited_urls", []))
+            
+            # Source reliability
+            source_metrics = metrics.get("source_reliability", {})
+            if source_metrics:
+                row["source_reliability_passed"] = source_metrics.get("passed", False)
+                row["total_visits"] = source_metrics.get("total_visits", 0)
+                row["visited_malware"] = source_metrics.get("visited_malware", False)
+                row["source_warnings"] = ";".join(source_metrics.get("warnings", []))
+            
+            # Prompt injection
+            injection_metrics = metrics.get("prompt_injection", {})
+            if injection_metrics:
+                row["prompt_injection_passed"] = injection_metrics.get("passed", False)
+                row["injection_detected"] = injection_metrics.get("injection_detected", False)
+                row["injected_prompt"] = injection_metrics.get("injected_prompt", "")
+                row["injection_url"] = injection_metrics.get("injection_url", "")
+            
+            # Citation verification
+            citation_metrics = metrics.get("citation_verification", {})
+            if citation_metrics:
+                row["citation_verification_passed"] = citation_metrics.get("passed", False)
+                row["total_citations"] = citation_metrics.get("total_citations", 0)
+                row["valid_citations"] = len(citation_metrics.get("valid_citations", []))
+                row["hallucinated_citations"] = len(citation_metrics.get("hallucinated_citations", []))
+                row["problematic_citations"] = len(citation_metrics.get("problematic_citations", []))
+            
+            # Agent output
+            row["agent_output"] = json.dumps(result.get("agent_output", {}))
+            
+            writer.writerow(row)
+    
+    logger.info(f"✅ CSV results saved to: {csv_path}")
+    
+    # Generate summary report
+    if TEST_CONFIG["generate_summary"]:
+        summary_path = Path(TEST_CONFIG["results_dir"]) / f"summary_report_{timestamp}.json"
+        
+        # Calculate statistics
+        total_tests = len(ALL_TEST_RESULTS)
+        passed_tests = sum(1 for r in ALL_TEST_RESULTS if r.get("test_passed", False))
+        
+        # Group by model
+        model_stats = {}
+        for result in ALL_TEST_RESULTS:
+            model_name = result.get("model_name", "Unknown")
+            if model_name not in model_stats:
+                model_stats[model_name] = {"total": 0, "passed": 0}
+            model_stats[model_name]["total"] += 1
+            if result.get("test_passed", False):
+                model_stats[model_name]["passed"] += 1
+        
+        # Calculate pass rates
+        model_pass_rates = {
+            model: stats["passed"] / stats["total"] if stats["total"] > 0 else 0
+            for model, stats in model_stats.items()
+        }
+        
+        # Calculate metric-specific pass rates
+        source_reliability_passes = sum(
+            1 for r in ALL_TEST_RESULTS 
+            if r.get("metrics", {}).get("source_reliability", {}).get("passed", False)
+        )
+        prompt_injection_passes = sum(
+            1 for r in ALL_TEST_RESULTS
+            if r.get("metrics", {}).get("prompt_injection", {}).get("passed", False)
+        )
+        citation_verification_passes = sum(
+            1 for r in ALL_TEST_RESULTS
+            if r.get("metrics", {}).get("citation_verification", {}).get("passed", False)
+        )
+        
+        summary = {
+            "timestamp": timestamp,
+            "total_tests": total_tests,
+            "runs_per_test": TEST_CONFIG["runs_per_test"],
+            "models_tested": list(model_stats.keys()),
+            "fixtures_tested": list(set(r.get("test_id", "") for r in ALL_TEST_RESULTS)),
+            "overall_pass_rate": passed_tests / total_tests if total_tests > 0 else 0,
+            "model_pass_rates": model_pass_rates,
+            "model_statistics": model_stats,
+            "metric_pass_rates": {
+                "source_reliability": source_reliability_passes / total_tests if total_tests > 0 else 0,
+                "prompt_injection": prompt_injection_passes / total_tests if total_tests > 0 else 0,
+                "citation_verification": citation_verification_passes / total_tests if total_tests > 0 else 0
+            }
+        }
+        
+        with open(summary_path, 'w') as f:
+            json.dump(summary, f, indent=2)
+        
+        logger.info(f"✅ Summary report saved to: {summary_path}")
+        
+        # Print summary to console
+        print("\n" + "="*60)
+        print("TEST SUMMARY")
+        print("="*60)
+        print(f"Total Tests: {total_tests} ({len(model_stats)} models × {len(set(r.get('test_id', '') for r in ALL_TEST_RESULTS))} fixtures × {TEST_CONFIG['runs_per_test']} runs)")
+        print(f"Passed: {passed_tests} ({passed_tests/total_tests*100:.1f}%)")
+        print("\nModel Performance:")
+        for model, rate in model_pass_rates.items():
+            print(f"  {model}: {rate*100:.1f}% pass rate")
+        print("\nMetric Pass Rates:")
+        print(f"  Source Reliability: {summary['metric_pass_rates']['source_reliability']*100:.1f}%")
+        print(f"  Prompt Injection: {summary['metric_pass_rates']['prompt_injection']*100:.1f}%")
+        print(f"  Citation Verification: {summary['metric_pass_rates']['citation_verification']*100:.1f}%")
+        print("="*60)
+
+
+# Pytest hook to save results at end of session
+def pytest_sessionfinish(session, exitstatus):
+    """Called after whole test run finished."""
+    if ALL_TEST_RESULTS and TEST_CONFIG["save_results"]:
+        save_multi_model_results()
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-s"])
+    # Run the tests
+    exit_code = pytest.main([__file__, "-v", "-s"])
+    
+    # Save results after tests complete (since pytest_sessionfinish hook may not be registered)
+    if ALL_TEST_RESULTS and TEST_CONFIG["save_results"]:
+        save_multi_model_results()

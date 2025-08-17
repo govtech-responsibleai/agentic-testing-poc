@@ -32,6 +32,9 @@ source .venv/bin/activate && uv run pytest tests/evals/test_decompose_answer.py:
 
 # Run agentic tests for web search safety
 source .venv/bin/activate && uv run pytest tests/agentic_testing/test_websearch_agent.py -v -s
+
+# Run multi-model tests (tests all configured models)
+uv run pytest tests/agentic_testing/test_websearch_agent.py
 ```
 
 ### Running the Application
@@ -74,7 +77,6 @@ Comprehensive framework for testing the FactCheckingAgent's web search functiona
   - `PromptInjectionEvaluator`: Tests resistance to prompt injections in web content
   - `CitationVerificationEvaluator`: Ensures no hallucinated citations
 - **Mock Tools** (`mock_tools.py`): Simulates DuckDuckGo search and URL fetching with controlled responses
-- **Mock Manager** (`mock_manager.py`): Advanced tool mocking that preserves signatures and tracks calls
 - **Test Fixtures** (`fixtures/websearch_fixtures.py`): Predefined test cases with various source types
 
 ### Test Categories
@@ -104,11 +106,11 @@ When adding safety tests:
 
 ## Agentic Testing Configuration
 
-**Mock Tools Approach**: The framework uses a tool wrapping approach that:
-- Preserves original tool signatures for compatibility
-- Intercepts tool calls to return fixture data
-- Tracks all tool interactions for analysis
-- Supports injection of malicious content for safety testing
+**Mock Tools Approach**: The framework uses simplified mock tools that:
+- Override tool methods directly for reliable interception
+- Return controlled fixture data for reproducible tests
+- Track all queries and URL visits for analysis
+- Inject malicious content into ALL visited URLs for comprehensive safety testing
 
 **API Requirements**: 
 - OpenAI API key required for QueryQualityEvaluator (uses embeddings)
@@ -121,7 +123,56 @@ When adding safety tests:
 2. **Authentication Errors**: May occur with LLM judge in tests - check API credentials
 3. **Long Test Execution**: Some tests may timeout due to multiple LLM calls
 
+## Multi-Model Testing Framework
+
+The agentic testing framework now supports testing multiple LLM models in a single test run. This enables systematic comparison of model performance across safety metrics.
+
+### Configuration (`test_config.py`)
+
+The test configuration file defines:
+- **Models to test**: Multiple LLM models can be configured with their API keys and endpoints
+- **Test parameters**:
+- `runs_per_test`: Number of times to run each test per model
+- `fixtures_to_test`: List of specific fixtures to test (e.g., `["websearch_00003"]`)
+- `save_results`: Whether to save CSV results and summary reports
+- `results_dir`: Directory for test results
+
+### Running Multi-Model Tests
+
+```bash
+# Run tests for all configured models
+uv run pytest tests/agentic_testing/test_websearch_agent.py
+
+# Run with verbose output
+uv run pytest tests/agentic_testing/test_websearch_agent.py -v -s
+
+# Run specific test fixtures
+# (Configure in test_config.py fixtures_to_test)
+```
+
+### Test Results
+
+Results are automatically saved to:
+- **CSV Results**: `tests/agentic_testing/results/multi_model_results_[timestamp].csv`
+  - Detailed metrics for each test run
+  - Model performance on each safety metric
+  - Agent outputs and error messages
+  
+- **Summary Report**: `tests/agentic_testing/results/summary_report_[timestamp].json`
+  - Overall pass rates per model
+  - Metric-specific performance comparison
+  - Statistical summary across all tests
+
+### Metrics Evaluated
+
+1. **Query Quality**: Cosine similarity between agent queries and golden queries
+2. **Source Reliability**: Detection of malware/unreliable sources
+3. **Prompt Injection Resistance**: Tests against injected malicious prompts
+4. **Citation Verification**: Ensures no hallucinated citations
+
 ## Recent Updates
 
-- **Agentic Testing Refactor**: Mock tools updated to use wrapping approach (preserves tool signatures)
-- **Mock Manager**: New `ToolMockManager` class provides advanced mocking capabilities
+- **Multi-Model Testing**: Framework supports testing multiple models with comprehensive CSV and JSON result tracking
+- **Enhanced Prompt Injection**: Mock tools now inject malicious prompts into ALL visited URLs for more rigorous testing
+- **Simplified Mock Tools**: Direct method override approach for reliable query tracking and fixture injection
+- **Query Tracking Fix**: Search queries are now properly captured for similarity analysis

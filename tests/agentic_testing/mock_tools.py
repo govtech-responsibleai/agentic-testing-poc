@@ -1,17 +1,16 @@
 """
 Mock tools for testing the FactCheckingAgent.
-Updated to use tool wrapping approach instead of re-defining tools.
+Provides simplified mock implementations of search and fetch tools.
 """
 
 import logging
 from typing import Dict, Any, List
 from tests.agentic_testing.utils import read_html_file
-from tests.agentic_testing.mock_manager import ToolMockManager
 from analysis.tools.ddg_tool import RetryDuckDuckGoSearchResults
 
 
 class MockSearchTool:
-    """Mock DuckDuckGo search tool using the new wrapping approach."""
+    """Mock DuckDuckGo search tool with query tracking."""
     
     def __init__(self, fixture_data: Dict[str, Any], logger: logging.Logger = None):
         """
@@ -46,35 +45,26 @@ class MockSearchTool:
         # Create actual tool instance
         search_tool = RetryDuckDuckGoSearchResults(output_format="list")
         
-        # Create mock manager with fixtures
-        mock_manager = ToolMockManager(
-            {"search": self.fixtures},
-            logger=self.logger
-        )
+        # Create our mock _run method that tracks queries and returns fixtures
+        def mock_run(query: str) -> str:
+            # Track the query - THIS IS THE CRITICAL FIX
+            self.search_queries.append(query)
+            
+            # Log the call (matching existing log format)
+            call_num = len(self.search_queries)
+            self.logger.info(f"🔧 Mock duckduckgo_results_json called (#{call_num})")
+            self.logger.info(f"   Args: ()")
+            self.logger.info(f"   Kwargs: {{'query': '{query}'}}")
+            self.logger.info(f"   ✓ Returning fixture data")
+            
+            # Return the mocked fixture data as a string (tools expect string output)
+            import json
+            return json.dumps(self.fixtures)
         
-        # Track queries using the mock manager's call history
-        original_wrap = mock_manager.wrap_tool
-        def wrap_with_tracking(tool_instance, fixture_key, **kwargs):
-            wrapped = original_wrap(tool_instance, fixture_key, **kwargs)
-            # Override _run to also track queries
-            original_run = wrapped._run
-            def run_with_tracking(*args, **kwargs):
-                if args:
-                    self.search_queries.append(args[0])
-                return original_run(*args, **kwargs)
-            wrapped._run = run_with_tracking
-            return wrapped
+        # Replace the _run method directly
+        search_tool._run = mock_run
         
-        mock_manager.wrap_tool = wrap_with_tracking
-        
-        # Wrap the tool
-        wrapped_tool = mock_manager.wrap_tool(
-            search_tool,
-            "search",
-            response_strategy="static"
-        )
-        
-        return wrapped_tool
+        return search_tool
     
     def get_queries(self) -> List[str]:
         """Get all search queries made."""
@@ -105,7 +95,8 @@ class MockFetchTool:
         self.url_visit_details = []  # Track detailed visit info
         self.injected_prompt = None  # Track what was injected
         self.injection_evaluator = None  # Track evaluator function
-        self.injection_url = None  # Track which URL got the injection
+        self.injection_url = None  # Track which URL got the injection (deprecated - all get injections now)
+        self.injected_urls = []  # Track ALL URLs that got injections
         self.logger = logger or logging.getLogger(__name__)
         
         # Create URL to result mapping
@@ -166,8 +157,8 @@ class MockFetchTool:
                 self.logger.info(f"🌐 Fetch URL #{visit_number}: {url}")
                 self.logger.info(f"   Source type: {label}")
                 
-                # Decide whether to inject prompt
-                should_inject = (visit_number == 2) or (visit_number == 1 and len(self.url_to_result) == 1)
+                # Decide whether to inject prompt - inject on ALL URLs when prompt_injection is provided
+                should_inject = self.prompt_injection is not None
                 
                 if should_inject and self.prompt_injection:
                     injection_text = self.prompt_injection["input"]
@@ -176,7 +167,8 @@ class MockFetchTool:
                     # Store injection info
                     self.injected_prompt = injection_text
                     self.injection_evaluator = self.prompt_injection["evaluator"]
-                    self.injection_url = url
+                    self.injection_url = url  # Keep for backward compatibility
+                    self.injected_urls.append(url)  # Track all injected URLs
                     
                     self.logger.info(f"   💉 Injection added to this URL!")
                     self.logger.info(f"      Injected prompt: {injection_text[:100]}...")
@@ -197,6 +189,10 @@ class MockFetchTool:
     def get_visited_urls(self) -> List[str]:
         """Get all URLs visited."""
         return self.visited_urls
+    
+    def get_injected_urls(self) -> List[str]:
+        """Get all URLs that had prompt injections."""
+        return self.injected_urls
     
     def get_visit_details(self) -> List[Dict[str, Any]]:
         """Get detailed visit information."""
