@@ -6,33 +6,63 @@ import os
 
 # Model configurations for testing
 MODEL_CONFIGS = [
+    # {
+    #     "name": "GPT-4o",
+    #     "model_id": "gpt-4o-2024-11-20",
+    #     "api_key_env": "WORK_OPENAI_API_KEY",
+    #     "base_url": "https://api.openai.com/v1"
+    # },
+    # {
+    #     "name": "GPT-4o Mini",
+    #     "model_id": "gpt-4o-mini-2024-07-18",
+    #     "api_key_env": "WORK_OPENAI_API_KEY",
+    #     "base_url": "https://api.openai.com/v1"
+    # },
+    # {
+    #     "name": "GPT-4.1",
+    #     "model_id": "gpt-4.1-2025-04-14",
+    #     "api_key_env": "WORK_OPENAI_API_KEY",
+    #     "base_url": "https://api.openai.com/v1"
+    # },
+    # {
+    #     "name": "GPT-4.1 Mini",
+    #     "model_id": "gpt-4.1-mini-2025-04-14", 
+    #     "api_key_env": "WORK_OPENAI_API_KEY",
+    #     "base_url": "https://api.openai.com/v1"
+    # },
+    # {
+    #     "name": "GPT-4.1 Nano",
+    #     "model_id": "gpt-4.1-nano-2025-04-14",
+    #     "api_key_env": "WORK_OPENAI_API_KEY",
+    #     "base_url": "https://api.openai.com/v1"
+    # },
+    # {
+    #     "name": "o3",
+    #     "model_id": "o3-2025-04-16",
+    #     "api_key_env": "WORK_OPENAI_API_KEY",
+    #     "base_url": "https://api.openai.com/v1"
+    # },
+    # {
+    #     "name": "o4 Mini",
+    #     "model_id": "o4-mini-2025-04-16",
+    #     "api_key_env": "WORK_OPENAI_API_KEY",
+    #     "base_url": "https://api.openai.com/v1"
+    # },
     {
-        "name": "GPT-4o",
-        "model_id": "gpt-4o-2024-11-20",
+        "name": "GPT-5",
+        "model_id": "gpt-5-2025-08-07",
         "api_key_env": "WORK_OPENAI_API_KEY",
         "base_url": "https://api.openai.com/v1"
     },
     {
-        "name": "GPT-4o Mini",
-        "model_id": "gpt-4o-mini-2024-07-18",
+        "name": "GPT-5 Mini",
+        "model_id": "gpt-5-mini-2025-08-07",
         "api_key_env": "WORK_OPENAI_API_KEY",
         "base_url": "https://api.openai.com/v1"
     },
     {
-        "name": "GPT-4.1",
-        "model_id": "gpt-4.1-2025-04-14",
-        "api_key_env": "WORK_OPENAI_API_KEY",
-        "base_url": "https://api.openai.com/v1"
-    },
-    {
-        "name": "GPT-4.1 Mini",
-        "model_id": "gpt-4.1-mini-2025-04-14", 
-        "api_key_env": "WORK_OPENAI_API_KEY",
-        "base_url": "https://api.openai.com/v1"
-    },
-    {
-        "name": "GPT-4.1 Nano",
-        "model_id": "gpt-4.1-nano-2025-04-14",
+        "name": "GPT-5 Nano",
+        "model_id": "gpt-5-nano-2025-08-07",
         "api_key_env": "WORK_OPENAI_API_KEY",
         "base_url": "https://api.openai.com/v1"
     }
