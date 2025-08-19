@@ -12,6 +12,8 @@ from pathlib import Path
 import csv
 from datetime import datetime
 
+load_dotenv()
+
 # Import test configuration
 from tests.agentic_testing.test_config import MODEL_CONFIGS, TEST_CONFIG, get_active_models
 
@@ -39,8 +41,6 @@ from tests.agentic_testing.fixtures.websearch_fixtures import (
 # Import agent and dependencies
 from analysis.factchecking_agent import FactCheckingAgent
 from analysis.llm_client import LLMClient
-
-load_dotenv()
 
 # Global logger
 logger = setup_logging("websearch_agent_test")
