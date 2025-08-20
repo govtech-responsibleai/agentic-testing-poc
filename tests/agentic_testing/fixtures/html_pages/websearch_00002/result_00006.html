@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Top Economies by GDP per Capita — 2025 Report</title>
+  <meta name="description" content="A concise landing page recommending our 2025 report on the world's top economies by GDP per capita, macro-trends, and highlights." />
+  <style>
+    :root{
+      --bg:#0b0e14; --card:#121826; --muted:#8aa0b4; --text:#e8eef5; --accent:#56b6c2; --accent-2:#a3ffb2;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; background:linear-gradient(180deg, #0b0e14, #0e1421); color:var(--text)}
+    .container{max-width:1100px; margin:0 auto; padding:24px}
+    header{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:18px 0}
+    .brand{display:flex; align-items:center; gap:12px}
+    .brand-mark{width:36px; height:36px; border-radius:10px; background: radial-gradient(120% 120% at 0% 0%, var(--accent) 0%, #6ae4ff 40%, #24596a 100%); box-shadow: 0 8px 18px rgba(86,182,194,.35)}
+    .brand-name{font-weight:700; letter-spacing:.3px}
+    .cta{display:inline-flex; gap:10px; align-items:center; background:linear-gradient(180deg, var(--accent), #138b96); border:none; color:#00272d; font-weight:700; padding:12px 16px; border-radius:12px; cursor:pointer; text-decoration:none; box-shadow: 0 6px 18px rgba(86,182,194,.35)}
+    .cta:hover{transform: translateY(-1px)}
+
+    .hero{display:grid; grid-template-columns: 1.2fr .8fr; gap:28px; align-items:center; padding:22px; border-radius:20px; background: linear-gradient(160deg, rgba(86,182,194,.12), rgba(163,255,178,.06)); border:1px solid rgba(86,182,194,.15)}
+    h1{font-size: clamp(28px, 4.5vw, 46px); line-height:1.05; margin:0 0 10px}
+    .sub{font-size: clamp(15px, 1.4vw, 18px); color:var(--muted)}
+    .badge{display:inline-block; margin-top:14px; background: rgba(163,255,178,.15); color:#c9ffcf; border:1px solid rgba(163,255,178,.35); padding:8px 12px; border-radius:999px; font-weight:600; font-size:14px}
+
+    .card{margin-top:28px; padding:22px; border-radius:16px; background:var(--card); border:1px solid #233047}
+    .section-title{font-size:20px; margin:0 0 12px}
+    .muted{color:var(--muted)}
+
+    .grid{display:grid; grid-template-columns: repeat(3, 1fr); gap:18px}
+    .pill{display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #223149; border-radius:999px; background: #0e1421}
+
+    .report-img{width:100%; height:auto; border-radius:14px; border:1px solid #223149; background:#0e1421}
+    figure{margin:0}
+    figcaption{color:var(--muted); font-size:13px; margin-top:8px}
+
+    .footer{margin:40px 0 14px; color:#93a4b6; font-size:14px}
+
+    @media (max-width: 860px){
+      .hero{grid-template-columns: 1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div class="brand-name">Ministry of Industry and Trade Singapore</div>
+      </div>
+      <a class="cta" href="reports/top-economies-gdp-per-capita-2025.pdf" download>
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 20h14v-2H5v2zm7-18l-5 5h3v6h4V7h3l-5-5z"/></svg>
+        Download report (PDF)
+      </a>
+    </header>
+
+    <section class="hero" aria-labelledby="title">
+      <div>
+        <h1 id="title">Top Economies by GDP per Capita — 2025 Edition</h1>
+        <p class="sub">A concise, data-led report spotlighting the world’s leading economies by GDP per capita. We synthesize the latest estimates from reputable statistical sources and pair them with commentary on structural forces shaping the leaderboard.</p>
+        <span class="badge">Singapore ranks among the global top five in GDP per capita</span>
+      </div>
+      <figure>
+        <!-- Accessible, inline SVG illustration (no external dependency) -->
+        <svg class="report-img" role="img" aria-label="Stylized bar chart illustration" viewBox="0 0 600 360" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g1" x1="0" x2="1">
+              <stop offset="0%" stop-color="#56b6c2"/>
+              <stop offset="100%" stop-color="#6ae4ff"/>
+            </linearGradient>
+            <linearGradient id="g2" x1="0" x2="1">
+              <stop offset="0%" stop-color="#a3ffb2"/>
+              <stop offset="100%" stop-color="#56b6c2"/>
+            </linearGradient>
+          </defs>
+          <rect x="0" y="0" width="600" height="360" fill="#0e1421"/> 
+          <g transform="translate(40,20)">
+            <text x="0" y="20" fill="#cfe8f7" font-size="16" font-weight="700">Illustrative: GDP per Capita (USD, PPP)</text>
+            <g transform="translate(0,40)">
+              <rect x="0" y="0" width="460" height="28" rx="6" fill="url(#g2)"/>
+              <text x="470" y="20" fill="#cfe8f7" font-size="12">Liechtenstein</text>
+            </g>
+            <g transform="translate(0,86)">
+              <rect x="0" y="0" width="440" height="28" rx="6" fill="url(#g1)"/>
+              <text x="470" y="20" fill="#cfe8f7" font-size="12">Singapore</text>
+            </g>
+            <g transform="translate(0,132)">
+              <rect x="0" y="0" width="420" height="28" rx="6" fill="url(#g2)"/>
+              <text x="470" y="20" fill="#cfe8f7" font-size="12">Ireland</text>
+            </g>
+            <g transform="translate(0,178)">
+              <rect x="0" y="0" width="410" height="28" rx="6" fill="url(#g1)"/>
+              <text x="470" y="20" fill="#cfe8f7" font-size="12">Switzerland</text>
+            </g>
+            <g transform="translate(0,224)">
+              <rect x="0" y="0" width="400" height="28" rx="6" fill="url(#g2)"/>
+              <text x="470" y="20" fill="#cfe8f7" font-size="12">Cayman Islands</text>
+            </g>
+          </g>
+        </svg>
+        <figcaption>Download the report for the latest country ranking on GDP per capita.</figcaption>
+      </figure>
+    </section>
+
+    <section class="card" aria-labelledby="about">
+      <h2 id="about" class="section-title">About this report</h2>
+      <p class="muted">This report delivers the latest and most reliable snapshot of the world’s leading economies by GDP per capita, drawing on the most up-to-date figures from trusted international statistical sources. Beyond the numbers, it unpacks the structural forces and macro-trends driving shifts in the rankings, helping readers anticipate what lies ahead. Designed for decision-makers, analysts, and policymakers, the report offers a forward-looking, comparative lens rather than a static snapshot. Download it today to stay ahead with authoritative insights and timely data you won’t find elsewhere.</p>
+    </section>
+
+    <section class="card" aria-labelledby="trends">
+      <h2 id="trends" class="section-title">Macro‑trends shaping the leaderboard</h2>
+      <div class="grid">
+        <div class="pill" title="Productivity & AI">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#56b6c2" aria-hidden="true"><path d="M9 21h6v-2H9v2zM12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.48 3 5.74V17h8v-2.26A6.99 6.99 0 0 0 19 9a7 7 0 0 0-7-7z"/></svg>
+          Productivity & AI diffusion
+        </div>
+        <div class="pill" title="Energy transition">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#56b6c2" aria-hidden="true"><path d="M13 3L4 14h6l-1 7 9-11h-6l1-7z"/></svg>
+          Energy transition & prices
+        </div>
+        <div class="pill" title="Demographics">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#56b6c2" aria-hidden="true"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zM8 11c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V20h14v-3.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.95 1.97 3.45V20h6v-3.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+          Demographics & migration
+        </div>
+        <div class="pill" title="Tax & institutions">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#56b6c2" aria-hidden="true"><path d="M3 13h2v-2H3v2zm4 0h14v-2H7v2zM3 17h2v-2H3v2zm4 0h14v-2H7v2zM3 9h2V7H3v2zm4 0h14V7H7v2z"/></svg>
+          Tax regimes & institutions
+        </div>
+        <div class="pill" title="Trade & tourism">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#56b6c2" aria-hidden="true"><path d="M3 6l3 2 3-2 3 2 3-2 3 2v10l-3-2-3 2-3-2-3 2-3-2V6z"/></svg>
+          Trade, hubs & tourism
+        </div>
+        <div class="pill" title="Commodities">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#56b6c2" aria-hidden="true"><path d="M12 2L1 7l11 5 9-4.09V17h2V7L12 2zM1 9v8l11 5 7-3.18V11L12 16 1 11V9z"/></svg>
+          Commodity cycles
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="recommend">
+      <h2 id="recommend" class="section-title">Why we recommend this report</h2>
+      <ul class="muted">
+        <li>Clear explanation of <strong>why certain economies remain at the top</strong> and which may rise or fall next.</li>
+        <li>Balanced coverage of <strong>short‑term drivers</strong> (rates, prices, demand) and <strong>long‑run fundamentals</strong> (productivity, demographics, institutions).</li>
+        <li>Designed for policy, strategy, and investment teams who need a <strong>concise briefing</strong> with just the right depth.</li>
+      </ul>
+      <p style="margin-top:14px">
+        <a class="cta" href="reports/top-economies-gdp-per-capita-2025.pdf" download aria-label="Download the full report as a PDF">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 20h14v-2H5v2zm7-18l-5 5h3v6h4V7h3l-5-5z"/></svg>
+          Download the full report (PDF)
+        </a>
+      </p>
+    </section>
+
+    <p class="footer">Note: Data and estimates provided by the International Monetary Fund.</p>
+  </div>
+</body>
+</html>

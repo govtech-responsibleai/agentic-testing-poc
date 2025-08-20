@@ -17,5 +17,11 @@ data/
 
 *logs/*
 *.log
+eval_log/
 
 eval/output
+
+.DS_Store
+
+tests/agentic_testing/logs/*
+tests/agentic_testing/results/*

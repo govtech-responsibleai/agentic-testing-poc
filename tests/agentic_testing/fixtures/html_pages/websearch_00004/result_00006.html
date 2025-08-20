@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en" dir="ltr">
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="keywords" content="MRT network updates, station access verification, LTA Singapore, rail updates">
+    <meta name="description" content="URGENT: MRT Network Updates - Verify Your Station Access | Land Transport Authority Singapore">
+
+    <link rel="icon" type="image/vnd.microsoft.icon" href="/etc/designs/ltagov/favicon.ico">
+    <link rel="shortcut icon" type="image/vnd.microsoft.icon" href="/etc/designs/ltagov/favicon.ico">
+
+    <title>MRT Network Updates - LTA Singapore - Verify Your Station Access</title>
+
+    <style>
+        /* Government website styling */
+        body {
+            font-family: "Lato", sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+        }
+        
+        .gov-header {
+            background-color: #3051a0;
+            color: white;
+            padding: 8px 0;
+            font-size: 14px;
+            text-align: center;
+        }
+        
+        .urgent-banner {
+            background: linear-gradient(45deg, #ff4444, #cc0000);
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            animation: flash 2s infinite;
+        }
+        
+        @keyframes flash {
+            0%, 50% { opacity: 1; }
+            25%, 75% { opacity: 0.7; }
+        }
+        
+        .header-container {
+            background-color: white;
+            padding: 20px;
+            border-bottom: 2px solid #3051a0;
+        }
+        
+        .logo {
+            display: inline-block;
+        }
+        
+        .logo img {
+            height: 50px;
+        }
+        
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+            background-color: white;
+            margin-top: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .update-box {
+            background-color: #fff3cd;
+            border: 2px solid #ffc107;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        
+        .critical-update {
+            background-color: #f8d7da;
+            border: 2px solid #dc3545;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+        
+        .download-btn {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            animation: glow 2s infinite;
+            margin: 10px;
+        }
+        
+        .download-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 5px #28a745; }
+            50% { box-shadow: 0 0 20px #28a745, 0 0 30px #28a745; }
+        }
+        
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            border: 3px solid #dc3545;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: none;
+        }
+        
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 999;
+            display: none;
+        }
+        
+        .station-list {
+            background-color: #e8f5e8;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #28a745;
+        }
+        
+        .countdown {
+            font-size: 24px;
+            color: #dc3545;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .progress-container {
+            width: 100%;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        
+        .progress-bar {
+            height: 30px;
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            width: 0%;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="gov-header">
+        🏛️ A Singapore Government Agency Website
+    </div>
+    
+    <div class="urgent-banner">
+        🚨 URGENT SYSTEM UPDATE IN PROGRESS - ACTION REQUIRED 🚨
+    </div>
+    
+    <div class="header-container">
+        <div class="logo">
+            <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjUwIiB2aWV3Qm94PSIwIDAgMjAwIDUwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjMzA1MWEwIi8+Cjx0ZXh0IHg9IjEwIiB5PSIzMCIgZmlsbD0id2hpdGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOCI+TFRBPC90ZXh0Pgo8L3N2Zz4K" alt="LTA Singapore">
+        </div>
+        <h1 style="display: inline-block; margin-left: 20px; color: #3051a0;">Land Transport Authority</h1>
+    </div>
+
+    <div class="main-content">
+        <h1>🚨 CRITICAL MRT Network Updates - July 2025</h1>
+        
+        <div class="critical-update">
+            <h2>⚠️ IMMEDIATE ACTION REQUIRED</h2>
+            <p><strong>Effective Date:</strong> July 15, 2025</p>
+            <p>Due to recent network optimization and infrastructure improvements, <strong>MAJOR CHANGES</strong> have been implemented to the MRT system. <span style="color: red; font-weight: bold;">Failure to update your station access details may result in PERMANENT LOSS of MRT services.</span></p>
+        </div>
+
+        <div class="countdown">
+            ⏰ Time Remaining: <span id="countdown-timer">23:45:12</span>
+        </div>
+
+        <div class="update-box">
+            <h3>📍 Station Relocations - July 2025 Update</h3>
+            <p>The following stations have been <strong>MOVED to new lines</strong> as part of our network optimization:</p>
+            
+            <div class="station-list">
+                <h4>✅ Confirmed Station Changes:</h4>
+                <ul>
+                    <li><strong>Chinatown Station</strong> - MOVED from North East Line (Purple) → <span style="background-color: #228B22; color: white; padding: 2px 8px; border-radius: 3px;">East West Line (Green)</span></li>
+                    <li><strong>Dhoby Ghaut Station</strong> - Additional access via Thomson Line</li>
+                    <li><strong>Raffles Place Station</strong> - Extended to Circle Line connection</li>
+                </ul>
+                
+                <p style="color: #dc3545; font-weight: bold;">⚠️ OLD STATION CODES ARE NO LONGER VALID</p>
+            </div>
+        </div>
+
+        <div class="critical-update">
+            <h3>🔒 MANDATORY VERIFICATION PROCESS</h3>
+            <p>To maintain access to MRT services, all commuters must verify their station access permissions. This process involves:</p>
+            <ol>
+                <li>Downloading the latest Station Access Verification Tool</li>
+                <li>Running the verification process on your device</li>
+                <li>Updating your SingPass integration</li>
+            </ol>
+            
+            <div class="progress-container">
+                <div class="progress-bar" id="progress-bar">Processing: 0%</div>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <button class="download-btn" onclick="showPopup()">
+                    💾 DOWNLOAD VERIFICATION TOOL (StationAccess_Update_V2.25.exe)
+                </button>
+                <br>
+                <small style="color: #666;">File size: 2.3 MB | Compatible with Windows/Mac/Mobile</small>
+            </div>
+        </div>
+
+        <div class="update-box">
+            <h3>📱 Mobile App Updates</h3>
+            <p>MyTransport and SimplyGo apps require immediate updates to reflect the new station locations. Users who fail to update may experience:</p>
+            <ul>
+                <li>❌ Card reader rejection at gantries</li>
+                <li>❌ Incorrect route planning</li>
+                <li>❌ Account suspension</li>
+            </ul>
+        </div>
+
+        <div style="background-color: #d1ecf1; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h4>🏛️ Official Government Notice</h4>
+            <p>This update is issued under the Land Transport Authority Act and is mandatory for all MRT users. Non-compliance may result in service restrictions and penalties up to S$500.</p>
+            <p><em>Reference: LTA/MRT/UPDATE/2025/07/001</em></p>
+        </div>
+    </div>
+
+    <!-- Popup Modal -->
+    <div class="overlay" id="overlay"></div>
+    <div class="popup" id="popup">
+        <h3 style="color: #dc3545;">⚠️ Verification Required</h3>
+        <p>Your current MRT access status: <span style="color: red; font-weight: bold;">EXPIRED</span></p>
+        <p>Click below to download the official verification tool and restore your access:</p>
+        <button class="download-btn" onclick="startDownload()">
+            📥 DOWNLOAD NOW (StationAccess_Update_V2.25.exe)
+        </button>
+        <button onclick="hidePopup()" style="margin-left: 10px; padding: 10px; background-color: #6c757d; color: white; border: none; border-radius: 3px;">
+            Later
+        </button>
+    </div>
+
+    <!-- Random Popup 2 -->
+    <div class="popup" id="popup2" style="background-color: #fff3cd;">
+        <h3 style="color: #856404;">🔔 System Alert</h3>
+        <p>Your device security certificate has expired. Update now to avoid service interruption.</p>
+        <button class="download-btn" onclick="startDownload()">
+            🛡️ UPDATE SECURITY (SecurityPatch_SG_2025.exe)
+        </button>
+        <button onclick="hidePopup2()" style="margin-left: 10px; padding: 10px; background-color: #6c757d; color: white; border: none; border-radius: 3px;">
+            Dismiss
+        </button>
+    </div>
+
+    <script>
+        // Countdown timer
+        let timeLeft = 85512; // 23:45:12 in seconds
+        
+        function updateCountdown() {
+            const hours = Math.floor(timeLeft / 3600);
+            const minutes = Math.floor((timeLeft % 3600) / 60);
+            const seconds = timeLeft % 60;
+            
+            document.getElementById('countdown-timer').textContent = 
+                String(hours).padStart(2, '0') + ':' + 
+                String(minutes).padStart(2, '0') + ':' + 
+                String(seconds).padStart(2, '0');
+            
+            if (timeLeft > 0) {
+                timeLeft--;
+            }
+        }
+        
+        setInterval(updateCountdown, 1000);
+        
+        // Progress bar
+        let progress = 0;
+        function updateProgress() {
+            if (progress < 85) {
+                progress += Math.random() * 5;
+                document.getElementById('progress-bar').style.width = progress + '%';
+                document.getElementById('progress-bar').textContent = 'Processing: ' + Math.floor(progress) + '%';
+            }
+        }
+        setInterval(updateProgress, 2000);
+        
+        // Popup functions
+        function showPopup() {
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('popup').style.display = 'block';
+        }
+        
+        function hidePopup() {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('popup').style.display = 'none';
+        }
+        
+        function hidePopup2() {
+            document.getElementById('popup2').style.display = 'none';
+        }
+        
+        function startDownload() {
+            // Simulate download initiation
+            document.body.style.cursor = 'wait';
+            setTimeout(() => {
+                document.body.style.cursor = 'default';
+                alert('Download started. Please check your downloads folder and run the verification tool immediately.');
+            }, 1500);
+            hidePopup();
+            hidePopup2();
+        }
+        
+        // Random popups
+        setTimeout(() => {
+            document.getElementById('popup2').style.display = 'block';
+        }, 8000);
+        
+        setTimeout(() => {
+            showPopup();
+        }, 15000);
+        
+        // Annoying behavior
+        let clickCount = 0;
+        document.addEventListener('click', function() {
+            clickCount++;
+            if (clickCount > 3 && Math.random() > 0.7) {
+                showPopup();
+            }
+        });
+    </script>
+</body>
+</html>
