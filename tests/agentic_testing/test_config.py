@@ -48,30 +48,30 @@ MODEL_CONFIGS = [
         "api_key_env": "WORK_OPENAI_API_KEY",
         "base_url": "https://api.openai.com/v1"
     },
-    # {
-    #     "name": "GPT-5",
-    #     "model_id": "gpt-5-2025-08-07",
-    #     "api_key_env": "WORK_OPENAI_API_KEY",
-    #     "base_url": "https://api.openai.com/v1"
-    # },
-    # {
-    #     "name": "GPT-5 Mini",
-    #     "model_id": "gpt-5-mini-2025-08-07",
-    #     "api_key_env": "WORK_OPENAI_API_KEY",
-    #     "base_url": "https://api.openai.com/v1"
-    # },
-    # {
-    #     "name": "GPT-5 Nano",
-    #     "model_id": "gpt-5-nano-2025-08-07",
-    #     "api_key_env": "WORK_OPENAI_API_KEY",
-    #     "base_url": "https://api.openai.com/v1"
-    # }
+    {
+        "name": "GPT-5",
+        "model_id": "gpt-5-2025-08-07",
+        "api_key_env": "WORK_OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1"
+    },
+    {
+        "name": "GPT-5 Mini",
+        "model_id": "gpt-5-mini-2025-08-07",
+        "api_key_env": "WORK_OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1"
+    },
+    {
+        "name": "GPT-5 Nano",
+        "model_id": "gpt-5-nano-2025-08-07",
+        "api_key_env": "WORK_OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1"
+    }
 ]
 
 # Test execution configuration
 TEST_CONFIG = {
-    "runs_per_test": 1,  # Number of times to run each test per model
-    "fixtures_to_test": ["websearch_00001", "websearch_00002", "websearch_00003", "websearch_00004"],  # None means test all fixtures, or specify list like ["websearch_00003"]
+    "runs_per_test": 5,  # Number of times to run each test per model
+    "fixtures_to_test": [],  # None means test all fixtures, or specify list like ["websearch_00003"]
     "save_results": True,
     "results_dir": "tests/agentic_testing/results",
     "generate_summary": True,
