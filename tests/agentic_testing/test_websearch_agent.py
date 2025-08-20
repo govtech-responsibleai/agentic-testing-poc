@@ -295,6 +295,7 @@ class TestWebSearchAgent:
                         "timestamp": datetime.now().isoformat(),
                         "test_passed": test_passed,
                         "failure_reasons": failure_reasons,
+                        "is_timeout": False,  # This is a successful completion, not a timeout
                         "metrics": {
                             "query_quality": query_results if test_fixture["golden_search_queries"] else None,
                             "source_reliability": source_results,
@@ -327,7 +328,35 @@ class TestWebSearchAgent:
                     
                 except Exception as e:
                     logger.info(f"Test execution error: {str(e)}")
-                    # Still save error results
+                    
+                    # Detect if this is a timeout/recursion limit error
+                    error_str = str(e)
+                    is_timeout = (
+                        "Recursion limit" in error_str or 
+                        "timeout" in error_str.lower() or
+                        "GRAPH_RECURSION_LIMIT" in error_str
+                    )
+                    
+                    # Try to calculate query quality even on error
+                    query_results = {}
+                    if test_fixture["golden_search_queries"] and mock_search.get_queries():
+                        try:
+                            query_results = evaluators["query_quality"].evaluate(
+                                mock_search.get_queries(),
+                                test_fixture["golden_search_queries"]
+                            )
+                            logger.info(f"Queries made before error: {mock_search.get_queries()}")
+                            logger.info(f"Query quality calculated: {query_results.get('normalized_score', 0):.3f}")
+                        except Exception as qe:
+                            logger.info(f"Could not calculate query quality: {qe}")
+                    
+                    # Determine failure reason
+                    if is_timeout:
+                        failure_reason = "TIMEOUT/MAX_RECURSION"
+                    else:
+                        failure_reason = f"Execution error: {str(e)}"
+                    
+                    # Still save error results with more detailed information
                     error_report = {
                         "model_name": model_config["name"],
                         "model_id": model_config["model_id"],
@@ -336,8 +365,21 @@ class TestWebSearchAgent:
                         "input_claim": test_fixture["input_claim"],
                         "timestamp": datetime.now().isoformat(),
                         "test_passed": False,
-                        "failure_reasons": [f"Execution error: {str(e)}"],
-                        "error": str(e)
+                        "failure_reasons": [failure_reason],
+                        "error": str(e),
+                        "is_timeout": is_timeout,
+                        "metrics": {
+                            "query_quality": query_results if query_results else None,
+                            "source_reliability": {"passed": False},
+                            "url_validation": {"passed": False},
+                            "prompt_injection": {"passed": False},
+                            "citation_verification": {"passed": False}
+                        },
+                        "execution_details": {
+                            "search_queries": mock_search.get_queries(),
+                            "visited_urls": mock_fetch.get_visited_urls(),
+                            "visit_details": mock_fetch.get_visit_details()
+                        }
                     }
                     ALL_TEST_RESULTS.append(error_report)
                     # Don't raise - allow other tests to continue
@@ -358,7 +400,7 @@ def save_multi_model_results():
     # Define CSV columns
     csv_columns = [
         "model_name", "model_id", "run_number", "test_id", "input_claim", "timestamp",
-        "test_passed", "failure_reasons", "error",
+        "test_passed", "failure_reasons", "error", "is_timeout",
         # Query quality metrics
         "query_max_similarity", "query_normalized_score", "query_embedding_model", "queries_made",
         # Source reliability metrics
@@ -390,6 +432,7 @@ def save_multi_model_results():
                 "test_passed": result.get("test_passed", False),
                 "failure_reasons": ";".join(result.get("failure_reasons", [])),
                 "error": result.get("error", ""),
+                "is_timeout": result.get("is_timeout", False),
             }
             
             # Add metrics if available
@@ -458,15 +501,21 @@ def save_multi_model_results():
         total_tests = len(ALL_TEST_RESULTS)
         passed_tests = sum(1 for r in ALL_TEST_RESULTS if r.get("test_passed", False))
         
+        # Count timeout/recursion errors
+        timeout_tests = sum(1 for r in ALL_TEST_RESULTS if r.get("is_timeout", False))
+        valid_completion_tests = total_tests - timeout_tests
+        
         # Group by model
         model_stats = {}
         for result in ALL_TEST_RESULTS:
             model_name = result.get("model_name", "Unknown")
             if model_name not in model_stats:
-                model_stats[model_name] = {"total": 0, "passed": 0}
+                model_stats[model_name] = {"total": 0, "passed": 0, "timeouts": 0}
             model_stats[model_name]["total"] += 1
             if result.get("test_passed", False):
                 model_stats[model_name]["passed"] += 1
+            if result.get("is_timeout", False):
+                model_stats[model_name]["timeouts"] += 1
         
         # Calculate pass rates
         model_pass_rates = {
@@ -474,39 +523,46 @@ def save_multi_model_results():
             for model, stats in model_stats.items()
         }
         
-        # Calculate metric-specific pass rates
+        # Calculate metric-specific pass rates (excluding timeouts from denominator)
+        # Only count tests that didn't timeout for the denominator
+        non_timeout_results = [r for r in ALL_TEST_RESULTS if not r.get("is_timeout", False)]
+        
         source_reliability_passes = sum(
-            1 for r in ALL_TEST_RESULTS 
+            1 for r in non_timeout_results 
             if r.get("metrics", {}).get("source_reliability", {}).get("passed", False)
         )
         url_validation_passes = sum(
-            1 for r in ALL_TEST_RESULTS
+            1 for r in non_timeout_results
             if r.get("metrics", {}).get("url_validation", {}).get("passed", False)
         )
         prompt_injection_passes = sum(
-            1 for r in ALL_TEST_RESULTS
+            1 for r in non_timeout_results
             if r.get("metrics", {}).get("prompt_injection", {}).get("passed", False)
         )
         citation_verification_passes = sum(
-            1 for r in ALL_TEST_RESULTS
+            1 for r in non_timeout_results
             if r.get("metrics", {}).get("citation_verification", {}).get("passed", False)
         )
         
         summary = {
             "timestamp": timestamp,
             "total_tests": total_tests,
+            "timeout_tests": timeout_tests,
+            "valid_completion_tests": valid_completion_tests,
             "runs_per_test": TEST_CONFIG["runs_per_test"],
             "models_tested": list(model_stats.keys()),
             "fixtures_tested": list(set(r.get("test_id", "") for r in ALL_TEST_RESULTS)),
             "overall_pass_rate": passed_tests / total_tests if total_tests > 0 else 0,
+            "timeout_rate": timeout_tests / total_tests if total_tests > 0 else 0,
             "model_pass_rates": model_pass_rates,
             "model_statistics": model_stats,
             "metric_pass_rates": {
-                "source_reliability": source_reliability_passes / total_tests if total_tests > 0 else 0,
-                "url_validation": url_validation_passes / total_tests if total_tests > 0 else 0,
-                "prompt_injection": prompt_injection_passes / total_tests if total_tests > 0 else 0,
-                "citation_verification": citation_verification_passes / total_tests if total_tests > 0 else 0
-            }
+                "source_reliability": source_reliability_passes / valid_completion_tests if valid_completion_tests > 0 else 0,
+                "url_validation": url_validation_passes / valid_completion_tests if valid_completion_tests > 0 else 0,
+                "prompt_injection": prompt_injection_passes / valid_completion_tests if valid_completion_tests > 0 else 0,
+                "citation_verification": citation_verification_passes / valid_completion_tests if valid_completion_tests > 0 else 0
+            },
+            "metric_pass_rates_note": "Pass rates calculated excluding timeout/recursion errors from denominator"
         }
         
         with open(summary_path, 'w') as f:
@@ -520,10 +576,17 @@ def save_multi_model_results():
         print("="*60)
         print(f"Total Tests: {total_tests} ({len(model_stats)} models × {len(set(r.get('test_id', '') for r in ALL_TEST_RESULTS))} fixtures × {TEST_CONFIG['runs_per_test']} runs)")
         print(f"Passed: {passed_tests} ({passed_tests/total_tests*100:.1f}%)")
+        if timeout_tests > 0:
+            print(f"Timeouts/Max Recursion: {timeout_tests} ({timeout_tests/total_tests*100:.1f}%)")
+            print(f"Valid Completions: {valid_completion_tests} (used for metric calculations)")
+        
         print("\nModel Performance:")
-        for model, rate in model_pass_rates.items():
-            print(f"  {model}: {rate*100:.1f}% pass rate")
-        print("\nMetric Pass Rates:")
+        for model, stats in model_stats.items():
+            rate = model_pass_rates[model]
+            timeout_info = f" ({stats['timeouts']} timeouts)" if stats['timeouts'] > 0 else ""
+            print(f"  {model}: {rate*100:.1f}% pass rate{timeout_info}")
+        
+        print("\nMetric Pass Rates (excluding timeouts from denominator):")
         print(f"  Source Reliability: {summary['metric_pass_rates']['source_reliability']*100:.1f}%")
         print(f"  URL Validation: {summary['metric_pass_rates']['url_validation']*100:.1f}%")
         print(f"  Prompt Injection: {summary['metric_pass_rates']['prompt_injection']*100:.1f}%")
