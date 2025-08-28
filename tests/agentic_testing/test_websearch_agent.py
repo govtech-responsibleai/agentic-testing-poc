@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 import csv
 from datetime import datetime
+import time
 
 load_dotenv()
 
@@ -499,13 +500,17 @@ class TestWebSearchAgent:
                     # Don't raise - allow other tests to continue
 
 
-def save_multi_model_results():
+def save_multi_model_results(worker_suffix=None):
     """Save test results to CSV and generate summary report."""
     if not ALL_TEST_RESULTS:
         logger.warning("No test results to save")
         return
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # Add worker suffix if provided (for pytest-xdist)
+    if worker_suffix:
+        timestamp = f"{timestamp}_{worker_suffix}"
 
     # Save detailed CSV results
     csv_path = Path(TEST_CONFIG["results_dir"]) / f"multi_model_results_{timestamp}.csv"
@@ -884,11 +889,79 @@ def save_multi_model_results():
         print("=" * 60)
 
 
+# Functions to aggregate worker nodes
+
+
+def save_worker_results(worker_id):
+    """Save raw ALL_TEST_RESULTS as JSON for this worker."""
+    results_dir = Path(TEST_CONFIG["results_dir"])
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    json_path = results_dir / f"worker_results_{timestamp}_{worker_id}.json"
+
+    with open(json_path, "w") as f:
+        json.dump(ALL_TEST_RESULTS, f, indent=2)
+
+    logger.info(
+        f"Worker {worker_id} saved {len(ALL_TEST_RESULTS)} results to: {json_path}"
+    )
+
+
+def aggregate_and_process_results():
+    """Aggregate all worker JSON files and process into CSV + summary."""
+    results_dir = Path(TEST_CONFIG["results_dir"])
+
+    # Find all worker JSON files
+    worker_jsons = list(results_dir.glob("worker_results_*_gw*.json"))
+
+    if not worker_jsons:
+        logger.warning("No worker JSON files found to aggregate")
+        return
+
+    # Load and combine all results
+    combined_results = []
+    for worker_json in worker_jsons:
+        logger.info(f"Loading worker results: {worker_json}")
+        with open(worker_json, "r") as f:
+            worker_data = json.load(f)
+            combined_results.extend(worker_data)
+
+    logger.info(
+        f"Combined {len(combined_results)} total results from {len(worker_jsons)} workers"
+    )
+
+    # Set ALL_TEST_RESULTS to combined data for processing
+    global ALL_TEST_RESULTS
+    ALL_TEST_RESULTS = combined_results
+
+    # Process everything using existing function
+    save_multi_model_results()
+
+    # Clean up worker files
+    for worker_json in worker_jsons:
+        worker_json.unlink()
+        logger.info(f"Cleaned up worker file: {worker_json}")
+
+
 # Pytest hook to save results at end of session
 def pytest_sessionfinish(session, exitstatus):
     """Called after whole test run finished."""
-    if ALL_TEST_RESULTS and TEST_CONFIG["save_results"]:
-        save_multi_model_results()
+    if hasattr(session.config, "workerinput"):
+        # This is a worker process - save raw results as JSON
+        if ALL_TEST_RESULTS and TEST_CONFIG["save_results"]:
+            worker_id = session.config.workerinput["workerid"]
+            save_worker_results(worker_id)
+    else:
+        # This is the master process
+        if TEST_CONFIG["save_results"]:
+            if ALL_TEST_RESULTS:
+                # Normal pytest (no xdist) - process results directly
+                save_multi_model_results()
+            else:
+                # pytest-xdist master - aggregate worker results
+                time.sleep(1)
+                aggregate_and_process_results()
 
 
 if __name__ == "__main__":
