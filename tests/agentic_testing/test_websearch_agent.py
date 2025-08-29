@@ -421,8 +421,6 @@ class TestWebSearchAgent:
                     report_path = save_test_report(test_fixture["test_id"], test_report)
                     logger.info(f"Detailed report saved to: {report_path}")
 
-                    # Note: We don't assert here to allow all tests to run and save results
-
                 except Exception as e:
                     logger.info(f"Test execution error: {str(e)}")
 
@@ -497,7 +495,10 @@ class TestWebSearchAgent:
                         },
                     }
                     ALL_TEST_RESULTS.append(error_report)
-                    # Don't raise - allow other tests to continue
+
+        # Assert based on overall test result to reflect in pytest
+        if "test_passed" in locals():
+            assert test_passed, f"Test failed - Reasons: {', '.join(failure_reasons)}"
 
 
 def save_multi_model_results(worker_suffix=None):
@@ -903,9 +904,10 @@ def save_worker_results(worker_id):
     with open(json_path, "w") as f:
         json.dump(ALL_TEST_RESULTS, f, indent=2)
 
-    logger.info(
-        f"Worker {worker_id} saved {len(ALL_TEST_RESULTS)} results to: {json_path}"
-    )
+    # # Comment out as logs will get too bloated
+    # logger.info(
+    #     f"Worker {worker_id} saved {len(ALL_TEST_RESULTS)} results to: {json_path}"
+    # )
 
 
 def aggregate_and_process_results():
@@ -921,8 +923,8 @@ def aggregate_and_process_results():
 
     # Load and combine all results
     combined_results = []
+    logger.info(f"Loading worker results from {len(worker_jsons)} workers.")
     for worker_json in worker_jsons:
-        logger.info(f"Loading worker results: {worker_json}")
         with open(worker_json, "r") as f:
             worker_data = json.load(f)
             combined_results.extend(worker_data)
@@ -939,9 +941,9 @@ def aggregate_and_process_results():
     save_multi_model_results()
 
     # Clean up worker files
+    logger.info(f"Cleaning up worker files from {len(worker_jsons)} workers.")
     for worker_json in worker_jsons:
         worker_json.unlink()
-        logger.info(f"Cleaned up worker file: {worker_json}")
 
 
 # Pytest hook to save results at end of session
