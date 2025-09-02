@@ -28,48 +28,6 @@ DO NOT include any text before or after the JSON object. DO NOT use markdown for
 
 # Model configurations for testing
 MODEL_CONFIGS = [
-    # {
-    #     "name": "GPT-4o",
-    #     "model_id": "azure/gpt-4o-eastus",
-    #     "api_key_env": "LITELLM_PROXY_API_KEY",
-    #     "base_url": "https://litellm-stg.aip.gov.sg/",
-    # },
-    # {
-    #     "name": "GPT-4o Mini",
-    #     "model_id": "azure/gpt-4o-mini-eastus",
-    #     "api_key_env": "LITELLM_PROXY_API_KEY",
-    #     "base_url": "https://litellm-stg.aip.gov.sg/",
-    # },
-    # {
-    #     "name": "GPT-4.1",
-    #     "model_id": "azure/gpt-4.1-eastus2",
-    #     "api_key_env": "LITELLM_PROXY_API_KEY",
-    #     "base_url": "https://litellm-stg.aip.gov.sg/",
-    # },
-    # {
-    #     "name": "GPT-4.1 Mini",
-    #     "model_id": "azure/gpt-4.1-mini-southeastasia",
-    #     "api_key_env": "LITELLM_PROXY_API_KEY",
-    #     "base_url": "https://litellm-stg.aip.gov.sg/",
-    # },
-    # {
-    #     "name": "GPT-4.1 Nano",
-    #     "model_id": "azure/gpt-4.1-nano-eastus2",
-    #     "api_key_env": "LITELLM_PROXY_API_KEY",
-    #     "base_url": "https://litellm-stg.aip.gov.sg/",
-    # },
-    # {
-    #     "name": "o3 Mini",
-    #     "model_id": "azure/o3-mini-eastus2",
-    #     "api_key_env": "LITELLM_PROXY_API_KEY",
-    #     "base_url": "https://litellm-stg.aip.gov.sg/",
-    # },
-    # {
-    #     "name": "o4 Mini", # Not added to LiteLLM proxy yet
-    #     "model_id": "o4-mini-2025-04-16",
-    #     "api_key_env": "LITELLM_PROXY_API_KEY",
-    #     "base_url": "https://litellm-stg.aip.gov.sg/",
-    # },
     {
         "name": "GPT-5",
         "model_id": "azure/gpt-5-eastus2",
@@ -88,18 +46,6 @@ MODEL_CONFIGS = [
         "api_key_env": "LITELLM_PROXY_API_KEY",
         "base_url": "https://litellm-stg.aip.gov.sg/",
     },
-    # {
-    #     "name": "GPT-OSS 20b",
-    #     "model_id": "openai.gpt-oss-20b-1:0",
-    #     "api_key_env": "LITELLM_PROXY_API_KEY",
-    #     "base_url": "https://litellm-stg.aip.gov.sg/",
-    # },
-    # {
-    #     "name": "GPT-OSS 120b",
-    #     "model_id": "openai.gpt-oss-120b-1:0",
-    #     "api_key_env": "LITELLM_PROXY_API_KEY",
-    #     "base_url": "https://litellm-stg.aip.gov.sg/",
-    # },
     {
         "name": "Gemini 2.5 Flash Lite",
         "model_id": "gemini-2.5-flash-lite",
@@ -118,12 +64,6 @@ MODEL_CONFIGS = [
         "api_key_env": "LITELLM_PROXY_API_KEY",
         "base_url": "https://litellm-stg.aip.gov.sg/",
     },
-    # {
-    #     "name": "Claude 3.5 Haiku",
-    #     "model_id": "anthropic.claude-3-5-haiku-20241022-v1:0",
-    #     "api_key_env": "LITELLM_PROXY_API_KEY",
-    #     "base_url": "https://litellm-stg.aip.gov.sg/",
-    # },
     {
         "name": "Claude 4 Sonnet",
         "model_id": "apac.anthropic.claude-sonnet-4-20250514-v1:0",
@@ -140,8 +80,8 @@ MODEL_CONFIGS = [
 
 # Test execution configuration
 TEST_CONFIG = {
-    "runs_per_test": 1,  # Number of times to run each test per model
-    "fixtures_to_test": ["websearch_00003"],  # None means test all fixtures, or specify list like ["websearch_00003"]
+    "runs_per_test": 3,  # Number of times to run each test per model
+    "fixtures_to_test": [],  # None means test all fixtures, or specify list like ["websearch_00003"]
     "save_results": True,
     "results_dir": "tests/agentic_testing/results",
     "generate_summary": True,
