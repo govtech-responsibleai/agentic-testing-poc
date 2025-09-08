@@ -53,6 +53,9 @@ from langgraph.prebuilt import create_react_agent as _real_create_react_agent
 # Langfuse imports
 from langfuse.callback import CallbackHandler
 
+# # Braintrust
+# from braintrust import init_logger
+# from braintrust_langchain import BraintrustCallbackHandler, set_global_handler
 
 # Global logger
 logger = setup_logging("websearch_agent_test")
@@ -78,6 +81,8 @@ class TestWebSearchAgent:
             "API_KEY": os.getenv(model_config["api_key_env"]),
             "BASE_URL": model_config["base_url"],
         }
+        if "default_headers" in model_config:
+            config["DEFAULT_HEADERS"] = model_config["default_headers"]
         return LLMClient(config), model_config
 
     @pytest.fixture
@@ -201,35 +206,49 @@ class TestWebSearchAgent:
                         # Create agent and run the search_and_check method
                         agent = FactCheckingAgent(client)
                         
-                        # Retry logic for rate limit errors
-                        max_retries = 3
-                        retry_delays = [10, 30, 60]  # seconds
-                        result = None
-                        
-                        for attempt in range(max_retries):
-                            try:
-                                result = agent._search_and_check(test_fixture["input_claim"])
-                                break  # Success, exit retry loop
-                            except Exception as retry_e:
-                                error_str = str(retry_e).lower()
-                                is_rate_limit = (
-                                    "rate limit" in error_str
-                                    or "too many requests" in error_str
-                                    or "429" in error_str
-                                    or "ratelimiterror" in error_str
-                                    or "quota exceeded" in error_str
-                                )
-                                
-                                if is_rate_limit and attempt < max_retries - 1:
-                                    wait_time = retry_delays[attempt]
-                                    logger.info(f"Rate limit detected, waiting {wait_time} seconds before retry {attempt + 2}/{max_retries}")
-                                    time.sleep(wait_time)
-                                    continue
-                                else:
-                                    # Not a rate limit error or max retries reached
-                                    raise retry_e
-                        
+                        # Wrap invocation + metrics so any exception is logged as an error report
                         try:
+                            # Retry logic for rate limit and recursion/timeout errors
+                            max_retries = 5
+                            retry_delays = [10, 30, 60, 60, 60]  # seconds
+                            result = None
+
+                            for attempt in range(max_retries):
+                                try:
+
+                                    # init_logger(project="Agentic Web Testing", api_key=os.environ.get("BRAINTRUST_API_KEY"))
+                                    # handler = BraintrustCallbackHandler()
+                                    # set_global_handler(handler)
+
+                                    result = agent._search_and_check(test_fixture["input_claim"])
+                                    break  # Success, exit retry loop
+                                except Exception as retry_e:
+                                    error_str = str(retry_e).lower()
+                                    is_rate_limit = (
+                                        "rate limit" in error_str
+                                        or "too many requests" in error_str
+                                        or "429" in error_str
+                                        or "ratelimiterror" in error_str
+                                        or "quota exceeded" in error_str
+                                    )
+
+                                    # Normalize checks to lowercase to actually detect these conditions
+                                    is_timeout_recursion_limit = (
+                                        "recursion limit" in error_str
+                                        or "timeout" in error_str
+                                        or "graph_recursion_limit" in error_str
+                                    )
+
+                                    if (is_rate_limit or is_timeout_recursion_limit) and attempt < max_retries - 1:
+                                        wait_time = retry_delays[attempt]
+                                        reason = "rate limit" if is_rate_limit else "recursion/timeout"
+                                        logger.info(f"{reason.capitalize()} detected, waiting {wait_time} seconds before retry {attempt + 2}/{max_retries}")
+                                        time.sleep(wait_time)
+                                        continue
+                                    else:
+                                        # Not a retryable error or max retries reached
+                                        raise retry_e
+
                             logger.info(f"Trace ID: {trace_id}")
                             log_section_header(logger, "AGENT OUTPUT", "-")
                             logger.info(json.dumps(result, indent=2))
@@ -494,28 +513,39 @@ class TestWebSearchAgent:
                             logger.info(f"Detailed report saved to: {report_path}")
 
                         except Exception as e:
-                            logger.info(f"Test execution error: {str(e)}")
+                            logger.error(f"Test execution error: {str(e)}")
                             # Detect if this is a timeout/recursion limit error
-                            error_str = str(e)
+                            error_str = str(e).lower()
                             is_timeout = (
-                                "Recursion limit" in error_str
-                                or "timeout" in error_str.lower()
-                                or "GRAPH_RECURSION_LIMIT" in error_str
+                                "recursion limit" in error_str
+                                or "timeout" in error_str
+                                or "graph_recursion_limit" in error_str
+                                or "graphrecursionerror" in error_str
                             )
                             # Detect if this is an infrastructure error (API/parsing/model errors)
                             is_infrastructure_error = (
-                                "OutputParserException" in error_str
-                                or "No deployments available for selected model" in error_str
-                                or "litellm.UnsupportedParamsError" in error_str
+                                "outputparserexception" in error_str
+                                or "no deployments available for selected model" in error_str
+                                or "litellm.unsupportedparamserror" in error_str
+                                or "503" in error_str  # HTTP 503 Service Unavailable
+                                or "service unavailable" in error_str
+                                or "502" in error_str  # Bad Gateway
+                                or "bad gateway" in error_str
+                                or "504" in error_str  # Gateway Timeout
+                                or "gateway timeout" in error_str
+                                or "<html" in error_str  # HTML error pages from API gateways
                             )
                             # Detect if this is a rate limit error (should have been handled by retry logic)
                             is_rate_limit = (
-                                "rate limit" in error_str.lower()
-                                or "too many requests" in error_str.lower()
+                                "rate limit" in error_str
+                                or "too many requests" in error_str
                                 or "429" in error_str
-                                or "ratelimiterror" in error_str.lower()
-                                or "quota exceeded" in error_str.lower()
+                                or "ratelimiterror" in error_str
+                                or "quota exceeded" in error_str
                             )
+                            
+                            # Catch-all for unrecognized errors
+                            is_unknown_error = not (is_timeout or is_infrastructure_error or is_rate_limit)
                             # Try to calculate query quality even on error
                             query_results = {}
                             if (
@@ -534,7 +564,8 @@ class TestWebSearchAgent:
                                         f"Query quality calculated: {query_results.get('normalized_score', 0):.3f}"
                                     )
                                 except Exception as qe:
-                                    logger.info(f"Could not calculate query quality: {qe}")
+                                    logger.warning(f"Could not calculate query quality: {qe}")
+                            
                             # Determine failure reason
                             if is_timeout:
                                 failure_reason = "TIMEOUT/MAX_RECURSION"
@@ -542,8 +573,15 @@ class TestWebSearchAgent:
                                 failure_reason = "INFRASTRUCTURE_ERROR"
                             elif is_rate_limit:
                                 failure_reason = "RATE_LIMIT_ERROR"
+                            elif is_unknown_error:
+                                failure_reason = "UNKNOWN_ERROR"
                             else:
                                 failure_reason = f"Execution error: {str(e)}"
+                            
+                            # Log failure reasons prominently with error message
+                            logger.error(f"❌ TEST FAILED - Reason: {failure_reason}")
+                            logger.error(f"Error details: {str(e)}")
+                            
                             # Still save error results with more detailed information
                             error_report = {
                                 "model_name": model_config["name"],
@@ -559,6 +597,7 @@ class TestWebSearchAgent:
                                 "error": str(e),
                                 "is_timeout": is_timeout,
                                 "is_infrastructure_error": is_infrastructure_error,
+                                "is_unknown_error": is_unknown_error,
                                 "metrics": {
                                     "query_quality": query_results if query_results else None,
                                     "source_reliability": {"passed": False},
@@ -573,6 +612,16 @@ class TestWebSearchAgent:
                                 },
                             }
                             ALL_TEST_RESULTS.append(error_report)
+                            
+                            # Save detailed error report to JSON file
+                            try:
+                                error_report_path = save_test_report(trace_id, error_report)
+                                logger.info(f"Error report saved to: {error_report_path}")
+                            except Exception as save_e:
+                                logger.error(f"Failed to save error report: {save_e}")
+                                
+                            # Re-raise the exception to mark test as failed
+                            raise e
 
         # Assert based on overall test result to reflect in pytest
         if "test_passed" in locals():
@@ -610,6 +659,7 @@ def save_multi_model_results(worker_suffix=None):
         "error",
         "is_timeout",
         "is_infrastructure_error",
+        "is_unknown_error",
         # Query quality metrics
         "query_max_similarity",
         "query_normalized_score",
@@ -663,6 +713,7 @@ def save_multi_model_results(worker_suffix=None):
                 "error": result.get("error", ""),
                 "is_timeout": result.get("is_timeout", False),
                 "is_infrastructure_error": result.get("is_infrastructure_error", False),
+            "is_unknown_error": result.get("is_unknown_error", False),
             }
 
             # Add metrics if available
@@ -997,10 +1048,7 @@ TEST CONFIGURATION: {len(summary['models_tested'])} models × {len(summary['fixt
     
     with open(txt_path, 'w') as f:
         f.write(summary_text)
-    
-    logger.info(f"✅ Text summary saved to: {txt_path}")
-    print(f"\n📋 Text summary available at: {txt_path}")
-    
+        
     return summary_text
 
 

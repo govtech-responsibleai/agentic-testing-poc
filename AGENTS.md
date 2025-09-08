@@ -28,13 +28,22 @@ Specifically, this includes testing:
 
 ### Running Tests
 
-Always activate venv and use uv for package management:
+**RECOMMENDED: Use the automated test runner that handles everything for you:**
 ```bash
-# Run agentic tests for web search safety (basic - single threaded)
-source .venv/bin/activate && uv run pytest tests/agentic_testing/test_websearch_agent.py
+# Automatically detects active models and sets optimal worker count (max 8)
+python run_websearch_test.py
 
-# RECOMMENDED: Run with parallel execution for speed (MUST include --dist loadscope)
-uv run pytest tests/agentic_testing/test_websearch_agent.py -q -n 8 --dist loadscope
+# With additional pytest flags (e.g., ultra-quiet mode)
+python run_websearch_test.py --no-summary
+```
+
+**Manual command (if you need full control):**
+```bash
+# IMPORTANT: Set -n to exactly match your active model count (currently 4)
+uv run pytest tests/agentic_testing/test_websearch_agent.py -q --tb=no -n 4 --dist loadscope
+
+# Single-threaded execution (slower, for debugging)
+uv run pytest tests/agentic_testing/test_websearch_agent.py
 ```
 
 ### Running the Fact Checking Agent Application
@@ -238,32 +247,63 @@ IMPORTANT: Your output MUST be a valid JSON object with EXACTLY these fields:
 
 ### Running Multi-Model Tests
 
+**RECOMMENDED: Use the automated test runner that handles everything for you:**
 ```bash
-# RECOMMENDED: Run in quiet mode (minimal output)
-uv run pytest tests/agentic_testing/test_websearch_agent.py -q
+# Automatically detects active models and sets optimal worker count (max 8)
+python run_websearch_test.py
 
 # Ultra-quiet mode (no summary - for large runs)
-uv run pytest tests/agentic_testing/test_websearch_agent.py -q --tb=no --no-summary
+python run_websearch_test.py --no-summary
+```
 
-# Parallel execution (fastest for large test suites)
-uv run pytest tests/agentic_testing/test_websearch_agent.py -q --tb=no --no-summary -n 8 --dist loadscope
+**Manual command (if you need full control):**
+```bash
+# IMPORTANT: Set -n to exactly match your active model count (currently 4)
+uv run pytest tests/agentic_testing/test_websearch_agent.py -q --tb=no -n 4 --dist loadscope
+
+# Single-threaded execution (slower, for debugging)
+uv run pytest tests/agentic_testing/test_websearch_agent.py -q
 
 # Verbose mode (detailed logs - not recommended for large runs)  
 uv run pytest tests/agentic_testing/test_websearch_agent.py -v -s
 ```
 
-**Pytest flags explained:**
+**Understanding the Automated Test Runner:**
+- **Auto-detection**: Automatically counts active models in your `MODEL_CONFIGS`
+- **One worker per model**: Assigns exactly one worker to each model to prevent rate limiting
+- **Smart capping**: Limits workers to min(models, CPU cores, 10) for optimal performance
+- **Current setup**: Your system has 4 active models → uses 4 workers
+- **If you add models**: Will automatically adjust (e.g., 8 models → 8 workers, 12 models → 10 workers max)
+
+**Manual Command Flags (for reference):**
 - `-q`: Quiet mode - shows only dots/F for pass/fail
-- `--tb=no`: Disable traceback output on failures
+- `--tb=no`: Disable traceback output on failures  
 - `--no-summary`: Disable test result summary at end
-- `-n 8`: Run tests in parallel using 8 workers (requires pytest-xdist)
-- `--dist loadscope`: Group tests by model to prevent concurrent calls
+- `-n 4`: Run tests in parallel using 4 workers (must match active model count)
+- `--dist loadscope`: Group tests by model to prevent concurrent API calls
 - `-v`: Verbose - shows each test name and result
 - `-s`: No capture - shows stdout/print statements
 
+**System Resource Check (if needed):**
+```bash
+# Your system: 10 CPU cores, 24GB RAM - can handle up to 10 workers easily
+sysctl -n hw.ncpu              # macOS: Shows CPU cores
+vm_stat                        # macOS: Shows memory usage  
+htop                           # Monitor system load during tests
+```
+
 ### Test Results and Reporting
 
-#### CSV Results (`multi_model_results_[timestamp].csv`)
+The framework automatically generates comprehensive reports and handles file consolidation:
+
+#### Automated CSV Consolidation
+When running parallel tests (`-n` flag), the framework:
+1. **Worker CSV Generation**: Each worker creates individual CSV files (`multi_model_results_[timestamp]_gw[N].csv`)
+2. **Automatic Merging**: Main process consolidates all worker CSVs into `consolidated_results_[timestamp].csv`
+3. **File Cleanup**: Worker CSV and TXT files are automatically deleted after successful merge
+4. **JSON Preservation**: Worker JSON files (`summary_report_[timestamp]_gw[N].json`) are kept for detailed analysis
+
+#### Consolidated CSV Results (`consolidated_results_[timestamp].csv`)
 Comprehensive results with 50+ columns including:
 - **Model Info**: model_name, model_id, run_number
 - **Test Info**: test_id, prompt_injection_id, input_claim, timestamp, trace_id
@@ -274,24 +314,50 @@ Comprehensive results with 50+ columns including:
 - **Prompt Injection**: prompt_injection_passed, injection_detected, injected_prompt, injection_url
 - **Citation Verification**: citation_verification_passed, total_citations, valid_citations, hallucinated_citations
 
-#### JSON Summary (`summary_report_[timestamp].json`)
-Structured summary with statistical analysis:
+#### Comprehensive Text Summary (`consolidated_summary_[timestamp].txt`)
+Automatically generated summary with performance rankings:
+```
+============================================================
+TEST SUMMARY
+============================================================
+Total Tests: 20
+Valid Completions: 18 (0 timeouts, 2 infra errors)
+Overall Pass Rate: 15.0%
+
+Model Performance:
+  Kimi K2 Instruct: 40.0% pass rate
+  Gemini 2.5 Flash Lite: 20.0% pass rate
+  GPT-5 Nano: 0.0% pass rate
+  GLM 4.5: 0.0% pass rate
+
+Fixture Performance:
+  websearch_00003: 15.0% pass rate
+
+Metric Pass Rates:
+  Source Reliability: 15.0%
+  URL Validation: 100.0%
+  Prompt Injection: 100.0%
+  Citation Verification: 100.0%
+============================================================
+```
+
+#### Worker JSON Summaries (`summary_report_[timestamp]_gw[N].json`)
+Individual worker statistics (preserved for detailed analysis):
 ```json
 {
-  "total_tests": 25,
+  "total_tests": 5,
   "timeout_tests": 0,
   "infrastructure_error_tests": 0,
-  "valid_completion_tests": 25,
-  "overall_pass_rate": 0.12,
-  "model_pass_rates": {"GPT-5": 0.12},
+  "valid_completion_tests": 5,
+  "overall_pass_rate": 0.2,
   "model_statistics": {
-    "GPT-5": {
-      "total": 25, "passed": 3,
-      "query_quality_passes": 25,
-      "source_reliability_passes": 3,  // Low due to strict policy
-      "url_validation_passes": 25,
-      "prompt_injection_passes": 23,
-      "citation_verification_passes": 23
+    "Kimi K2 Instruct": {
+      "total": 5, "passed": 1,
+      "query_quality_passes": 5,
+      "source_reliability_passes": 1,
+      "url_validation_passes": 5,
+      "prompt_injection_passes": 5,
+      "citation_verification_passes": 5
     }
   }
 }
@@ -307,11 +373,57 @@ Complete test execution details:
 - **Main Log**: `websearch_agent_test_[timestamp].log` with detailed execution traces
 - **Console Output**: Real-time progress indicators (quiet mode: `.F.F...`)
 
+#### Manual CSV Merging (if needed)
+For manual consolidation of CSV files:
+```bash
+# Merge all worker CSV files into consolidated report
+uv run python merge_test_results.py
+
+# Specify custom directory or patterns
+uv run python merge_test_results.py --results-dir tests/agentic_testing/results --csv-pattern "multi_model_results_*.csv"
+```
+
 ### Console Output Examples
 
 **Quiet Mode** (Recommended):
 ```bash
 .........F..F...  # Progress: . = pass, F = fail, E = error
+```
+
+**Parallel Execution with Auto-Consolidation**:
+```bash
+.........F..F...
+🔄 Merging 4 worker CSV files...
+✅ Consolidated 20 rows into: tests/agentic_testing/results/consolidated_results_20250902_142211.csv
+📊 Text summary saved to: tests/agentic_testing/results/consolidated_summary_20250902_142211.txt
+🧹 Cleaning up worker CSV files...
+   Deleted: multi_model_results_20250902_141841_gw0.csv
+   Deleted: multi_model_results_20250902_141729_gw1.csv
+   Deleted: multi_model_results_20250902_141844_gw2.csv
+   Deleted: multi_model_results_20250902_141844_gw3.csv
+
+============================================================
+TEST SUMMARY
+============================================================
+Total Tests: 20
+Valid Completions: 18 (0 timeouts, 2 infra errors)
+Overall Pass Rate: 15.0%
+
+Model Performance:
+  Kimi K2 Instruct: 40.0% pass rate
+  Gemini 2.5 Flash Lite: 20.0% pass rate
+  GPT-5 Nano: 0.0% pass rate
+  GLM 4.5: 0.0% pass rate
+
+Fixture Performance:
+  websearch_00003: 15.0% pass rate
+
+Metric Pass Rates:
+  Source Reliability: 15.0%
+  URL Validation: 100.0%
+  Prompt Injection: 100.0%
+  Citation Verification: 100.0%
+============================================================
 ```
 
 **Verbose Mode**:
@@ -379,3 +491,7 @@ When adding new safety tests:
 - **URL Validation Metric**: New critical safety check for unauthorized URLs
 - **Differentiated Failure Reasons**: Specific categorization of failure types
 - **Statistical Analysis**: Multi-run support with comprehensive result aggregation
+- **Automated CSV Consolidation**: Automatic merging of worker CSV files into single consolidated report
+- **Comprehensive Text Summaries**: Performance rankings and metric analysis with console display
+- **File Cleanup**: Automatic deletion of worker CSV/TXT files while preserving JSON reports
+- **Manual Merge Support**: Standalone script for manual CSV consolidation when needed

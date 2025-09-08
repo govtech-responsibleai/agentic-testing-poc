@@ -40,18 +40,18 @@ MODEL_CONFIGS = [
         "api_key_env": "LITELLM_PROXY_API_KEY",
         "base_url": "https://litellm-stg.aip.gov.sg/",
     },
-    {
-        "name": "GPT-5 Nano",
-        "model_id": "azure/gpt-5-nano-eastus2",
-        "api_key_env": "LITELLM_PROXY_API_KEY",
-        "base_url": "https://litellm-stg.aip.gov.sg/",
-    },
-    {
-        "name": "Gemini 2.5 Flash Lite",
-        "model_id": "gemini-2.5-flash-lite",
-        "api_key_env": "LITELLM_PROXY_API_KEY",
-        "base_url": "https://litellm-stg.aip.gov.sg/",
-    },
+    # {
+    #     "name": "GPT-5 Nano",
+    #     "model_id": "azure/gpt-5-nano-eastus2",
+    #     "api_key_env": "LITELLM_PROXY_API_KEY",
+    #     "base_url": "https://litellm-stg.aip.gov.sg/",
+    # },
+    # {
+    #     "name": "Gemini 2.5 Flash Lite",
+    #     "model_id": "gemini-2.5-flash-lite",
+    #     "api_key_env": "LITELLM_PROXY_API_KEY",
+    #     "base_url": "https://litellm-stg.aip.gov.sg/",
+    # },
     {
         "name": "Gemini 2.5 Flash",
         "model_id": "gemini-2.5-flash",
@@ -75,6 +75,42 @@ MODEL_CONFIGS = [
         "model_id": "us.anthropic.claude-opus-4-1-20250805-v1:0",
         "api_key_env": "LITELLM_PROXY_API_KEY",
         "base_url": "https://litellm-stg.aip.gov.sg/",
+    },
+    {
+        "name": "Kimi K2 Instruct",
+        "model_id": "moonshotai/Kimi-K2-Instruct:groq",
+        "api_key_env": "HF_API_KEY",
+        "base_url": "https://router.huggingface.co/v1",
+        "default_headers": {
+            "X-HF-Bill-To": "govtech"
+        },
+    },
+    {
+        "name": "GLM 4.5",
+        "model_id": "zai-org/GLM-4.5:fireworks-ai",
+        "api_key_env": "HF_API_KEY",
+        "base_url": "https://router.huggingface.co/v1",
+        "default_headers": {
+            "X-HF-Bill-To": "govtech"
+        },
+    },
+    {
+        "name": "DeepSeek V3.1",
+        "model_id": "deepseek-ai/DeepSeek-V3.1:novita",
+        "api_key_env": "HF_API_KEY",
+        "base_url": "https://router.huggingface.co/v1",
+        "default_headers": {
+            "X-HF-Bill-To": "govtech"
+        },
+    },
+    {
+        "name": "Qwen 3 235B A22B Instruct",
+        "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507:cerebras",
+        "api_key_env": "HF_API_KEY",
+        "base_url": "https://router.huggingface.co/v1",
+        "default_headers": {
+            "X-HF-Bill-To": "govtech"
+        },
     },
 ]
 
