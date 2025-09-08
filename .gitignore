@@ -23,5 +23,5 @@ eval/output
 
 .DS_Store
 
-tests/agentic_testing/logs/*
-tests/agentic_testing/results/*
+web_agent/tests/agentic_testing/logs/*
+web_agent/tests/agentic_testing/results/*

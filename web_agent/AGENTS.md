@@ -4,7 +4,11 @@ This file provides guidance to a Coding Agent when working with this repository.
 
 ## Project Overview
 
-This is a safety testing POC for a Fact Checking Agent. The Fact Checking Agent evaluates LLM responses for hallucinations and factuality by:
+This is the `web_agent` POC within the broader **Agentic Testing POC** mono-repository. The parent directory contains multiple POC projects:
+- `web_agent`: Safety testing for Fact Checking Agents (this project)
+- `cli_agent`: CLI agent testing (future POC)
+
+This specific POC focuses on safety testing for a Fact Checking Agent. The Fact Checking Agent evaluates LLM responses for hallucinations and factuality by:
 1. Decomposing answers into individual claims
 2. Checking if claims are verifiable
 3. Performing hallucination checks against provided context
@@ -39,8 +43,8 @@ python run_websearch_test.py --no-summary
 
 **Manual command (if you need full control):**
 ```bash
-# IMPORTANT: Set -n to exactly match your active model count (currently 4)
-uv run pytest tests/agentic_testing/test_websearch_agent.py -q --tb=no -n 4 --dist loadscope
+# IMPORTANT: Set -n to exactly match your active model count (currently 8)
+uv run pytest tests/agentic_testing/test_websearch_agent.py -q --tb=no -n 8 --dist loadscope
 
 # Single-threaded execution (slower, for debugging)
 uv run pytest tests/agentic_testing/test_websearch_agent.py
@@ -193,10 +197,11 @@ The framework evaluates agent safety across 5 critical metrics:
 ### Multi-Model Testing Configuration (`test_config.py`)
 
 #### Model Configurations
-Currently configured for testing 8 different LLM models:
-- **GPT Models**: GPT-5, GPT-5 Mini, GPT-5 Nano
-- **Gemini Models**: Gemini 2.5 Flash Lite, Gemini 2.5 Flash, Gemini 2.5 Pro
+Currently configured for testing multiple LLM models:
+- **GPT Models**: GPT-5, GPT-5 Mini
+- **Gemini Models**: Gemini 2.5 Flash, Gemini 2.5 Pro  
 - **Claude Models**: Claude 4 Sonnet, Claude 4.1 Opus
+- **Other Models**: Kimi K2 Instruct, GLM 4.5, DeepSeek V3.1, Qwen 3 235B A22B Instruct
 
 Each model configuration includes:
 - Display name and model ID
@@ -206,8 +211,8 @@ Each model configuration includes:
 #### Test Configuration
 ```python
 TEST_CONFIG = {
-    "runs_per_test": 1,  # Statistical runs per test
-    "fixtures_to_test": ["websearch_00003"],  # Filter specific fixtures
+    "runs_per_test": 3,  # Statistical runs per test
+    "fixtures_to_test": [],  # None means test all fixtures, or specify list like ["websearch_00003"]
     "save_results": True,
     "results_dir": "tests/agentic_testing/results",
     "timeout_seconds": 120,
@@ -258,8 +263,8 @@ python run_websearch_test.py --no-summary
 
 **Manual command (if you need full control):**
 ```bash
-# IMPORTANT: Set -n to exactly match your active model count (currently 4)
-uv run pytest tests/agentic_testing/test_websearch_agent.py -q --tb=no -n 4 --dist loadscope
+# IMPORTANT: Set -n to exactly match your active model count (currently 8)
+uv run pytest tests/agentic_testing/test_websearch_agent.py -q --tb=no -n 8 --dist loadscope
 
 # Single-threaded execution (slower, for debugging)
 uv run pytest tests/agentic_testing/test_websearch_agent.py -q
@@ -272,14 +277,14 @@ uv run pytest tests/agentic_testing/test_websearch_agent.py -v -s
 - **Auto-detection**: Automatically counts active models in your `MODEL_CONFIGS`
 - **One worker per model**: Assigns exactly one worker to each model to prevent rate limiting
 - **Smart capping**: Limits workers to min(models, CPU cores, 10) for optimal performance
-- **Current setup**: Your system has 4 active models → uses 4 workers
+- **Current setup**: Your system has 8 active models → uses 8 workers
 - **If you add models**: Will automatically adjust (e.g., 8 models → 8 workers, 12 models → 10 workers max)
 
 **Manual Command Flags (for reference):**
 - `-q`: Quiet mode - shows only dots/F for pass/fail
 - `--tb=no`: Disable traceback output on failures  
 - `--no-summary`: Disable test result summary at end
-- `-n 4`: Run tests in parallel using 4 workers (must match active model count)
+- `-n 8`: Run tests in parallel using 8 workers (must match active model count)
 - `--dist loadscope`: Group tests by model to prevent concurrent API calls
 - `-v`: Verbose - shows each test name and result
 - `-s`: No capture - shows stdout/print statements
@@ -393,7 +398,7 @@ uv run python merge_test_results.py --results-dir tests/agentic_testing/results 
 **Parallel Execution with Auto-Consolidation**:
 ```bash
 .........F..F...
-🔄 Merging 4 worker CSV files...
+🔄 Merging 8 worker CSV files...
 ✅ Consolidated 20 rows into: tests/agentic_testing/results/consolidated_results_20250902_142211.csv
 📊 Text summary saved to: tests/agentic_testing/results/consolidated_summary_20250902_142211.txt
 🧹 Cleaning up worker CSV files...
