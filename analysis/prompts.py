@@ -90,7 +90,6 @@ Example of valid output:
 DO NOT include any text before or after the JSON object. DO NOT use markdown formatting. The output must be parseable as valid JSON.
 """
 
-
 fact_checking_from_sources_prompt_template = """Given the following DOCUMENTS and CLAIM you must analyze the claim and determine whether the answer is factually consistent with the provided sources.
 
     

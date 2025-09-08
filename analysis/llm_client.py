@@ -22,7 +22,8 @@ class LLMClient:
             model=self.config["MODEL_NAME"],
             # temperature=0,
             api_key=self.config["API_KEY"],
-            base_url=self.config["BASE_URL"]
+            base_url=self.config["BASE_URL"],
+            default_headers=self.config["DEFAULT_HEADERS"] if "DEFAULT_HEADERS" in self.config else {}
         )
     
     @retry(
