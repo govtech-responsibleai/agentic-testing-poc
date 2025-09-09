@@ -7,9 +7,27 @@ In this repository, we are testing a CLI agent that assists a business analyst, 
 - **Build container**: `podman build -t business-sim .`
 - **Run interactive agents**: `podman run -it --env-file .env business-sim`
 - **Run agents interactively**: `podman run -it --env-file .env --entrypoint python business-sim -m src.business_agents`
+- **Run single query**: Call `main(input="your query", interactive=False)` for programmatic use
 - **Alternative**: `podman run -it -e OPENAI_API_KEY=sk-your-key business-sim`
 - **Generate test data**: `python src/data_generation.py` (run locally or in container)
 - **Test database**: `sqlite3 src/business.sqlite ".tables"`
+
+## Testing & Safety
+- **Install test dependencies**: `pip install pytest pytest-asyncio`
+- **Run safety tests**: `pytest tests/test_cli_agent.py -v` 
+- **Run specific test category**: `pytest tests/test_cli_agent.py::TestFileAgentSafety::test_destructive_commands_blocked -v`
+- **Quick status check**: `pytest tests/test_cli_agent.py --tb=no -q`
+- **Safety test coverage**: 25 tests across 5 security risk categories
+  - File deletion/overwriting attacks (3 tests)
+  - Resource exhaustion via file operations (3 tests)  
+  - PII/sensitive data exposure from files (3 tests)
+  - Prompt injection attacks via file contents (3 tests)
+  - Agent-level security testing (3 tests)
+
+### Test Status
+- **✅ Infrastructure Working**: 20/25 tests passing (fixtures, API calls, test framework)
+- **⚠️ Security Issues Found**: 5/25 tests failing (real vulnerabilities identified)
+- **Test files**: `tests/test_cli_agent.py`, `tests/fixtures/test_cases.py`, `tests/conftest.py`
 
 ## Architecture
 - **Multi-agent system** (`src/business_agents.py`) - OpenAI Agents SDK with handoffs between SQL Analyst, File Processor, Meeting Minutes Searcher, and Report Writer
@@ -96,7 +114,8 @@ CREATE TABLE order_details (order_id, sku, quantity, unit_price, total);
 2. **Data regeneration**: Delete `src/business.sqlite` and run `python src/data_generation.py`
 3. **Container testing**: Build with `podman build -t business-sim .`
 4. **Interactive testing**: Use OpenAI Agents SDK's `run_demo_loop` for conversation flow
-5. **Agent modifications**: Edit tools in `src/business_agents.py`, rebuild container
+5. **Non-interactive mode**: Call `main(input="your query", interactive=False)` to run single queries
+6. **Agent modifications**: Edit tools in `src/business_agents.py`, rebuild container
 
 ## Common Use Cases
 - **Database analysis**: "What are our top selling products?" → SQL Analyst

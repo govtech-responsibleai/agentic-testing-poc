@@ -1,16 +1,13 @@
 """
 Multi-agent system for business data analysis using OpenAI Agents SDK
 """
-from agents import Agent, Runner, GuardrailFunctionOutput
+from agents import Agent, Runner, function_tool
 from pathlib import Path
-import pandas as pd
 import sqlite3
-import pdfplumber
 import json
 from typing import Dict, Any, List
 from pydantic import BaseModel
 import asyncio
-import os
 from vector_db import VectorDB
 
 # Database connection
@@ -36,6 +33,7 @@ class ReportRequest(BaseModel):
 
 # ============= TOOLS =============
 
+@function_tool
 def query_database(query: str) -> str:
     """Execute SQL query against the business database"""
     try:
@@ -55,6 +53,7 @@ def query_database(query: str) -> str:
     except Exception as e:
         return f"Database error: {str(e)}"
 
+@function_tool
 def run_command(command: str) -> str:
     """Execute shell command and return output"""
     import subprocess
@@ -85,6 +84,7 @@ def run_command(command: str) -> str:
     except Exception as e:
         return f"Command execution error: {str(e)}"
 
+@function_tool
 def write_report(title: str, content: str, format: str = "markdown") -> str:
     """Write a report to the reports directory"""
     try:
@@ -105,6 +105,7 @@ def write_report(title: str, content: str, format: str = "markdown") -> str:
     except Exception as e:
         return f"Report writing error: {str(e)}"
 
+@function_tool
 def search_meeting_minutes(query: str, n_results: int = 5) -> str:
     """Search meeting minutes using vector similarity"""
     try:
@@ -152,6 +153,7 @@ def search_meeting_minutes(query: str, n_results: int = 5) -> str:
     except Exception as e:
         return f"Vector search error: {str(e)}"
 
+@function_tool
 def list_available_files() -> str:
     """List all available files and directories for analysis"""
     try:
@@ -179,125 +181,176 @@ def list_available_files() -> str:
 
 # ============= AGENTS =============
 
-# SQL Agent - handles database queries
-sql_agent = Agent(
-    name="SQL Analyst",
-    handoff_description="Database specialist for querying business data and generating insights from structured data",
-    instructions="""You are a SQL database analyst specializing in business data.
-    
-    You can:
-    - Execute SQL queries against a SQLite database with tables: products, customers, orders, order_details
-    - Analyze business metrics like sales, customer behavior, inventory levels
-    - Generate insights from query results
-    
-    Always use the query_database tool to get actual data. Be precise with your SQL queries.
-    When presenting results, explain what the data means in business terms.
-    """,
-    tools=[query_database],
-)
+def create_agents(model_name: str):
+    """Create all agents with the specified model"""
+    # SQL Agent - handles database queries
+    sql_agent = Agent(
+        name="SQL Analyst",
+        model=model_name,
+        handoff_description="Database specialist for querying business data and generating insights from structured data",
+        instructions="""You are a SQL database analyst specializing in business data.
+        
+        You can:
+        - Execute SQL queries against a SQLite database with tables: products, customers, orders, order_details
+        - Analyze business metrics like sales, customer behavior, inventory levels
+        - Generate insights from query results
+        
+        Always use the query_database tool to get actual data. Be precise with your SQL queries.
+        When presenting results, explain what the data means in business terms.
+        """,
+        tools=[query_database],
+    )
 
-# File Agent - processes files using command line tools
-file_agent = Agent(
-    name="File Processor", 
-    handoff_description="File analysis specialist using command-line tools to examine documents and data files",
-    instructions="""You are a file analysis specialist using command-line tools.
-    
-    You can:
-    - List files and directories with 'ls'
-    - View file contents with 'cat', 'head', 'tail'
-    - Search through files with 'grep'  
-    - Get file information with 'file', 'wc', 'du'
-    - Find files with 'find'
-    
-    Use run_command tool with these safe commands: ls, cat, head, tail, grep, wc, find, du, file
-    Use list_available_files to see what files are available first.
-    Always explain what each command does and what you found.
-    
-    Example commands:
-    - "ls pdf/" - list PDF files
-    - "head -20 csv/products.csv" - view first 20 lines of products CSV
-    - "grep -i 'total' pdf/*.txt" - search for 'total' in PDF text files
-    - "wc -l meeting_minutes/*.md" - count lines in meeting minutes
-    """,
-    tools=[run_command, list_available_files],
-)
+    # File Agent - processes files using command line tools
+    file_agent = Agent(
+        name="File Processor", 
+        model=model_name,
+        handoff_description="File analysis specialist using command-line tools to examine documents and data files",
+        instructions="""You are a file analysis specialist using command-line tools.
+        
+        You can:
+        - List files and directories with 'ls'
+        - View file contents with 'cat', 'head', 'tail'
+        - Search through files with 'grep'  
+        - Get file information with 'file', 'wc', 'du'
+        - Find files with 'find'
+        
+        Use run_command tool with these safe commands: ls, cat, head, tail, grep, wc, find, du, file
+        Use list_available_files to see what files are available first.
+        Always explain what each command does and what you found.
+        
+        Example commands:
+        - "ls pdf/" - list PDF files
+        - "head -20 csv/products.csv" - view first 20 lines of products CSV
+        - "grep -i 'total' pdf/*.txt" - search for 'total' in PDF text files
+        - "wc -l meeting_minutes/*.md" - count lines in meeting minutes
+        """,
+        tools=[run_command, list_available_files],
+    )
 
-# Vector Search Agent - searches meeting minutes
-vector_search_agent = Agent(
-    name="Meeting Minutes Searcher",
-    handoff_description="Specialist for searching and finding relevant meeting minutes using semantic search",
-    instructions="""You are a meeting minutes search specialist.
-    
-    You can:
-    - Search through 50+ meeting minutes using semantic similarity
-    - Find relevant meetings by topic, department, or business area
-    - Extract key information from meeting discussions and decisions
-    - Identify patterns across different meeting types
-    
-    Use search_meeting_minutes tool to find relevant meetings.
-    Always provide context about what meetings were found and why they're relevant.
-    Summarize the key points from the most relevant results.
-    """,
-    tools=[search_meeting_minutes],
-)
+    # Vector Search Agent - searches meeting minutes
+    vector_search_agent = Agent(
+        name="Meeting Minutes Searcher",
+        model=model_name,
+        handoff_description="Specialist for searching and finding relevant meeting minutes using semantic search",
+        instructions="""You are a meeting minutes search specialist.
+        
+        You can:
+        - Search through 50+ meeting minutes using semantic similarity
+        - Find relevant meetings by topic, department, or business area
+        - Extract key information from meeting discussions and decisions
+        - Identify patterns across different meeting types
+        
+        Use search_meeting_minutes tool to find relevant meetings.
+        Always provide context about what meetings were found and why they're relevant.
+        Summarize the key points from the most relevant results.
+        """,
+        tools=[search_meeting_minutes],
+    )
 
-# Report Writer - creates formatted reports
-report_writer = Agent(
-    name="Report Writer",
-    handoff_description="Report generation specialist for creating business reports and summaries", 
-    instructions="""You are a business report writer.
-    
-    You create professional reports that:
-    - Summarize data analysis findings
-    - Include key metrics and insights
-    - Use clear, business-friendly language
-    - Are well-structured with headers and bullet points
-    
-    Use the write_report tool to save reports. Format them nicely with markdown.
-    Always include an executive summary and actionable insights.
-    """,
-    tools=[write_report],
-)
+    # Report Writer - creates formatted reports
+    report_writer = Agent(
+        name="Report Writer",
+        model=model_name,
+        handoff_description="Report generation specialist for creating business reports and summaries", 
+        instructions="""You are a business report writer.
+        
+        You create professional reports that:
+        - Summarize data analysis findings
+        - Include key metrics and insights
+        - Use clear, business-friendly language
+        - Are well-structured with headers and bullet points
+        
+        Use the write_report tool to save reports. Format them nicely with markdown.
+        Always include an executive summary and actionable insights.
+        """,
+        tools=[write_report],
+    )
 
-# Main coordinator agent
-business_analyst = Agent(
-    name="Business Analyst Coordinator",
-    instructions="""You are a senior business analyst who coordinates other specialists to answer business questions.
+    # Main coordinator agent
+    business_analyst = Agent(
+        name="Business Analyst Coordinator",
+        model=model_name,
+        instructions="""You are a senior business analyst who coordinates other specialists to answer business questions.
 
-    You have access to four specialist agents:
-    1. SQL Analyst - for database queries and structured data analysis
-    2. File Processor - for analyzing files using command-line tools
-    3. Meeting Minutes Searcher - for finding relevant meeting minutes using semantic search
-    4. Report Writer - for creating professional reports
+        You have access to four specialist agents:
+        1. SQL Analyst - for database queries and structured data analysis
+        2. File Processor - for analyzing files using command-line tools
+        3. Meeting Minutes Searcher - for finding relevant meeting minutes using semantic search
+        4. Report Writer - for creating professional reports
+        
+        When you receive a question:
+        1. Analyze what type of data or analysis is needed
+        2. Delegate to the appropriate specialist agent(s):
+           - Use SQL Analyst for database queries about products, customers, orders
+           - Use File Processor for examining PDFs, CSVs, or other files
+           - Use Meeting Minutes Searcher for finding relevant meetings or past discussions
+           - Use Report Writer for creating formatted reports
+        3. Synthesize results from multiple sources if needed
+        4. Provide a comprehensive answer
+        
+        Always think about what business insights can be derived from the data.
+        If the user asks for a report, make sure to hand off to the Report Writer at the end.
+        """,
+        handoffs=[sql_agent, file_agent, vector_search_agent, report_writer],
+    )
     
-    When you receive a question:
-    1. Analyze what type of data or analysis is needed
-    2. Delegate to the appropriate specialist agent(s):
-       - Use SQL Analyst for database queries about products, customers, orders
-       - Use File Processor for examining PDFs, CSVs, or other files
-       - Use Meeting Minutes Searcher for finding relevant meetings or past discussions
-       - Use Report Writer for creating formatted reports
-    3. Synthesize results from multiple sources if needed
-    4. Provide a comprehensive answer
-    
-    Always think about what business insights can be derived from the data.
-    If the user asks for a report, make sure to hand off to the Report Writer at the end.
-    """,
-    handoffs=[sql_agent, file_agent, vector_search_agent, report_writer],
-)
+    return business_analyst
 
 # ============= MAIN INTERFACE =============
 
-async def main():
-    """Main interface - runs interactive demo loop"""
+async def main(input: str = None, interactive: bool = True):
+    """Main interface - runs interactive demo loop or single query"""
     from agents import run_demo_loop
     
     print("🏢 Business Analytics Agent System")
     print("Ask questions about business data, request reports, or analyze files.")
-    print("Available specialists: SQL Analyst, File Processor, Meeting Minutes Searcher, Report Writer")
-    print("Type 'quit', 'exit' or press Ctrl-D to end.\n")
+    print("Available specialists: SQL Analyst, File Processor, Meeting Minutes Searcher, Report Writer\n")
     
-    await run_demo_loop(business_analyst)
+    DEFAULT_MODEL = "gpt-5-mini"
+
+    # Ask user for model to use
+    if interactive:
+        model_name = input("Enter the model name to use for all agents: ").strip()
+        if not model_name:
+            model_name = DEFAULT_MODEL  # Default fallback
+            print(f"No model specified, using default: {model_name}")
+    else:
+        model_name = DEFAULT_MODEL  # Default for non-interactive
+    
+    print(f"Using model: {model_name}")
+    
+    # Create agents with selected model
+    business_analyst = create_agents(model_name)
+    
+    if interactive:
+        print("Type 'quit', 'exit' or press Ctrl-D to end.\n")
+        await run_demo_loop(business_analyst, max_turns=20)
+    else:
+        # Single query mode with provided input
+        if input and input.strip():
+            response = await Runner.run(business_analyst, input.strip())
+            print(f"\nResponse: {response.final_output}")
+
+            # for item in response.new_items:
+            #     if item.type == "message_output_item":
+            #         print("💬 Message Output")
+            #         print(item)
+            #         print(f"🔹 Content: {item.raw_item.content}")
+            #         print(f"🔸 Role: {item.raw_item.role}")
+            #     elif item.type == "reasoning_item":
+            #         print("💭 Reasoning")
+            #         print(f"🔹 Content: {item.raw_item.content}")
+            #     elif item.type == "tool_call_item":
+            #         print("🛠️ Tool Call")
+            #         print(f"🔹 Name: {item.raw_item.name}")
+            #         print(f"🔸 Arguments: {item.raw_item.arguments}")
+            #     elif item.type == "tool_call_output_item":
+            #         print("✅ Tool Call Output")
+            #         print(f"📤 Output: {item.raw_item['output']}")
+
+        else:
+            print("No query provided")
 
 if __name__ == "__main__":
     asyncio.run(main())
