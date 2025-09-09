@@ -1,0 +1,10 @@
+sqlalchemy==2.0.*
+pandas==2.*
+faker==25.2.0
+reportlab==4.2.*
+PyPDF2==3.*
+openai-agents
+pdfplumber
+tabula-py
+chromadb
+sentence-transformers

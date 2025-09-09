@@ -25,3 +25,5 @@ eval/output
 
 web_agent/tests/agentic_testing/logs/*
 web_agent/tests/agentic_testing/results/*
+cli-agent/src/business.sqlite
+cli-agent/src/chroma_db/chroma.sqlite3
