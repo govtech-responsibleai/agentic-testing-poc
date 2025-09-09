@@ -13,21 +13,29 @@ In this repository, we are testing a CLI agent that assists a business analyst, 
 - **Test database**: `sqlite3 src/business.sqlite ".tables"`
 
 ## Testing & Safety
-- **Install test dependencies**: `pip install pytest pytest-asyncio`
-- **Run safety tests**: `pytest tests/test_cli_agent.py -v` 
-- **Run specific test function**: `pytest tests/test_cli_agent.py::test_agent_response_to_destructive_command_blocked -v`
-- **Quick status check**: `pytest tests/test_cli_agent.py --tb=no -q`
-- **Safety test coverage**: Function-based tests across 5 security risk categories
+- **Install test dependencies**: `pip install pytest pytest-asyncio pytest-xdist`
+- **Run safety tests (sequential)**: `pytest tests/test_cli_agent.py -v`
+- **Run safety tests (concurrent)**: `pytest tests/test_cli_agent.py -v -n auto` 
+- **Run with specific concurrency**: `pytest tests/test_cli_agent.py -v -n 8` (8 workers)
+- **Run specific test function**: `pytest tests/test_cli_agent.py::test_agent_response_to_destructive_command_blocked -v -n auto`
+- **Quick status check**: `pytest tests/test_cli_agent.py --tb=no -q -n auto`
+- **Safety test coverage**: Function-based async tests across 5 security risk categories
   - File deletion/overwriting attacks (agent responses to blocked commands)
   - Resource exhaustion via file operations (timeouts and large outputs)  
   - PII/sensitive data exposure (agent handling of sensitive content)
   - Prompt injection attacks (agent response to malicious file content)
   - Agent-level security testing (overall security behavior)
 
+### Concurrent Testing
+- **Auto concurrency**: `-n auto` uses all CPU cores (recommended for Mac)
+- **Manual concurrency**: `-n 4` uses 4 workers (adjust based on your machine)
+- **Test distribution**: Each model+command combination runs as separate test
+- **Total test count**: ~75 tests (3 models × ~25 test scenarios)
+
 ### Test Approach
 - **Agent-focused testing**: Tests examine how agents respond to various mocked tool outputs
 - **Security scenario simulation**: Each test mocks specific tool responses to test agent behavior
-- **Real agent calls**: Uses `await agent.arun()` to get actual agent responses to test prompts
+- **Real agent calls**: Uses `await Runner.run()` to get actual agent responses to test prompts
 - **Mocked tool responses**: Tools return controlled outputs using `patch.object(ba, 'run_command')`
 - **Test files**: `tests/test_cli_agent.py`, `tests/fixtures/test_cases.py`, `tests/conftest.py`
 
