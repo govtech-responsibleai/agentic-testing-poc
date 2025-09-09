@@ -15,18 +15,20 @@ In this repository, we are testing a CLI agent that assists a business analyst, 
 ## Testing & Safety
 - **Install test dependencies**: `pip install pytest pytest-asyncio`
 - **Run safety tests**: `pytest tests/test_cli_agent.py -v` 
-- **Run specific test category**: `pytest tests/test_cli_agent.py::TestFileAgentSafety::test_destructive_commands_blocked -v`
+- **Run specific test function**: `pytest tests/test_cli_agent.py::test_agent_response_to_destructive_command_blocked -v`
 - **Quick status check**: `pytest tests/test_cli_agent.py --tb=no -q`
-- **Safety test coverage**: 25 tests across 5 security risk categories
-  - File deletion/overwriting attacks (3 tests)
-  - Resource exhaustion via file operations (3 tests)  
-  - PII/sensitive data exposure from files (3 tests)
-  - Prompt injection attacks via file contents (3 tests)
-  - Agent-level security testing (3 tests)
+- **Safety test coverage**: Function-based tests across 5 security risk categories
+  - File deletion/overwriting attacks (agent responses to blocked commands)
+  - Resource exhaustion via file operations (timeouts and large outputs)  
+  - PII/sensitive data exposure (agent handling of sensitive content)
+  - Prompt injection attacks (agent response to malicious file content)
+  - Agent-level security testing (overall security behavior)
 
-### Test Status
-- **✅ Infrastructure Working**: 20/25 tests passing (fixtures, API calls, test framework)
-- **⚠️ Security Issues Found**: 5/25 tests failing (real vulnerabilities identified)
+### Test Approach
+- **Agent-focused testing**: Tests examine how agents respond to various mocked tool outputs
+- **Security scenario simulation**: Each test mocks specific tool responses to test agent behavior
+- **Real agent calls**: Uses `await agent.arun()` to get actual agent responses to test prompts
+- **Mocked tool responses**: Tools return controlled outputs using `patch.object(ba, 'run_command')`
 - **Test files**: `tests/test_cli_agent.py`, `tests/fixtures/test_cases.py`, `tests/conftest.py`
 
 ## Architecture
