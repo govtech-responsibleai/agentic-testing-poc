@@ -6,7 +6,7 @@ PyPDF2==3.*
 openai-agents
 pdfplumber
 pytest==8.4.2
-pytest-asyncio==0.24.*
+pytest-asyncio==1.1.*
 pytest-xdist==3.6.*
 tabula-py
 chromadb
