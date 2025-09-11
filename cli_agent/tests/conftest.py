@@ -5,18 +5,7 @@ module is skipped rather than erroring out.
 """
 
 import os
-
 import pytest
-import sys
-import importlib.util
-from pathlib import Path
-
-# Load the local agents stub and register it as 'agents'
-_agents_path = Path(__file__).resolve().parent.parent / "agents" / "__init__.py"
-spec = importlib.util.spec_from_file_location("agents", _agents_path)
-_stub_agents = importlib.util.module_from_spec(spec)
-sys.modules["agents"] = _stub_agents
-spec.loader.exec_module(_stub_agents)
 
 
 @pytest.fixture(autouse=True)

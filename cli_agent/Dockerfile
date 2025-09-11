@@ -10,21 +10,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential libfreetype6-dev libjpeg-dev curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Install uv
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:$PATH"
+# Skip uv install; use stdlib venv + pip for portability
 
 WORKDIR /app
 
 # Create virtual environment and install Python dependencies
-RUN uv venv /app/.venv
+RUN python -m venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
 COPY requirements.txt .
-RUN uv pip install -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Copy application source and pre-cached embedding models
+# Copy application source, tests, and pre-cached embedding models
 COPY src/ ./src
+COPY tests/ ./tests
 COPY models/ /root/.cache/chroma/
 
 # Generate data only if database doesn't exist

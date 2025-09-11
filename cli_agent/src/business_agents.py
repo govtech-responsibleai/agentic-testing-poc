@@ -1,19 +1,23 @@
 """
 Multi-agent system for business data analysis using OpenAI Agents SDK
 """
-from agents import Agent, Runner, function_tool
+from agents import Agent, Runner, function_tool, SQLiteSession
+from openai.types.responses import ResponseTextDeltaEvent
 from pathlib import Path
+import builtins
 import sqlite3
 import json
 from typing import Dict, Any, List
 from pydantic import BaseModel
 import asyncio
+import inspect
+import uuid
 from vector_db import VectorDB
 
 # Database connection
 DB_PATH = Path(__file__).parent / "business.sqlite"
 DOCS_DIR = Path(__file__).parent / "docs"
-REPORTS_DIR = Path("/app/reports")
+REPORTS_DIR = Path("/app/output_reports")
 
 class QueryResult(BaseModel):
     query: str
@@ -299,56 +303,101 @@ def create_agents(model_name: str):
 
 # ============= MAIN INTERFACE =============
 
+async def _simple_interactive_loop(agent, max_turns: int = 20) -> None:
+    """Fallback interactive loop using Runner.run without the SDK demo helper."""
+    turns = 0
+    while turns < max_turns:
+        try:
+            user_input = builtins.input("> ").strip()
+        except EOFError:
+            print("\nExiting.")
+            break
+        if not user_input:
+            continue
+        if user_input.lower() in {"quit", "exit"}:
+            print("Goodbye!")
+            break
+        response = await Runner.run(agent, user_input)
+        print(response.final_output)
+        turns += 1
+
 async def main(input: str = None, interactive: bool = True):
     """Main interface - runs interactive demo loop or single query"""
-    from agents import run_demo_loop
     
     print("🏢 Business Analytics Agent System")
     print("Ask questions about business data, request reports, or analyze files.")
     print("Available specialists: SQL Analyst, File Processor, Meeting Minutes Searcher, Report Writer\n")
     
     DEFAULT_MODEL = "gpt-5-mini"
+    AVAILABLE_MODELS = ["gpt-5", "gpt-5-mini", "gpt-5-nano"]
 
     # Ask user for model to use
     if interactive:
-        model_name = input("Enter the model name to use for all agents: ").strip()
-        if not model_name:
-            model_name = DEFAULT_MODEL  # Default fallback
-            print(f"No model specified, using default: {model_name}")
+        print("Available models:")
+        for i, model in enumerate(AVAILABLE_MODELS, 1):
+            marker = " (default)" if model == DEFAULT_MODEL else ""
+            print(f"  {i}. {model}{marker}")
+        
+        choice = builtins.input(f"Select model (1-{len(AVAILABLE_MODELS)}) [default: {AVAILABLE_MODELS.index(DEFAULT_MODEL) + 1}]: ").strip()
+        if not choice:
+            model_name = DEFAULT_MODEL
+            print(f"No selection made, using default: {model_name}")
+        elif choice.isdigit() and 1 <= int(choice) <= len(AVAILABLE_MODELS):
+            model_name = AVAILABLE_MODELS[int(choice) - 1]
+        else:
+            print(f"Invalid selection '{choice}', using default: {DEFAULT_MODEL}")
+            model_name = DEFAULT_MODEL
+        
+        max_turns_input = builtins.input("Enter maximum turns (default 50): ").strip()
+        if max_turns_input and max_turns_input.isdigit():
+            max_turns = int(max_turns_input)
+        else:
+            max_turns = 50
+            print(f"No valid max_turns specified, using default: {max_turns}")
     else:
         model_name = DEFAULT_MODEL  # Default for non-interactive
+        max_turns = 50  # Default for non-interactive
     
     print(f"Using model: {model_name}")
     
     # Create agents with selected model
     business_analyst = create_agents(model_name)
     
+    # Create session instance with unique conversation ID
+    conversation_id = str(uuid.uuid4())
+    session = SQLiteSession(conversation_id)
+    print(f"Session ID: {conversation_id}")
+    
     if interactive:
         print("Type 'quit', 'exit' or press Ctrl-D to end.\n")
-        await run_demo_loop(business_analyst, max_turns=20)
+        turns = 0
+        
+        while turns < max_turns:
+            try:
+                user_input = builtins.input("> ").strip()
+            except EOFError:
+                print("\nExiting.")
+                break
+            if not user_input:
+                continue
+            if user_input.lower() in {"quit", "exit"}:
+                print("Goodbye!")
+                break
+            
+            result = Runner.run_streamed(business_analyst, user_input, session=session, max_turns=max_turns)
+            async for event in result.stream_events():
+                if event.type == "raw_response_event" and isinstance(event.data, ResponseTextDeltaEvent):
+                    print(event.data.delta, end="", flush=True)
+            print()  # New line after streaming completes
+            turns += 1
     else:
         # Single query mode with provided input
         if input and input.strip():
-            response = await Runner.run(business_analyst, input.strip())
-            print(f"\nResponse: {response.final_output}")
-
-            # for item in response.new_items:
-            #     if item.type == "message_output_item":
-            #         print("💬 Message Output")
-            #         print(item)
-            #         print(f"🔹 Content: {item.raw_item.content}")
-            #         print(f"🔸 Role: {item.raw_item.role}")
-            #     elif item.type == "reasoning_item":
-            #         print("💭 Reasoning")
-            #         print(f"🔹 Content: {item.raw_item.content}")
-            #     elif item.type == "tool_call_item":
-            #         print("🛠️ Tool Call")
-            #         print(f"🔹 Name: {item.raw_item.name}")
-            #         print(f"🔸 Arguments: {item.raw_item.arguments}")
-            #     elif item.type == "tool_call_output_item":
-            #         print("✅ Tool Call Output")
-            #         print(f"📤 Output: {item.raw_item['output']}")
-
+            result = Runner.run_streamed(business_analyst, input.strip(), session=session)
+            async for event in result.stream_events():
+                if event.type == "raw_response_event" and isinstance(event.data, ResponseTextDeltaEvent):
+                    print(event.data.delta, end="", flush=True)
+            print()  # New line after streaming completes
         else:
             print("No query provided")
 
