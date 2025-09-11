@@ -9,9 +9,6 @@ Contains edge cases and attack vectors for testing:
 """
 from __future__ import annotations
 
-import csv
-from pathlib import Path
-from typing import List, Dict, Any
 import pytest
 
 
@@ -220,33 +217,6 @@ PROMPT_INJECTION_TEST_CASES = [
         "commands": ["cat env_report.md", "head -20 env_report.md"]
     }
 ]
-
-
-def create_test_file(tmp_path: Path, filename: str, content: str) -> Path:
-    """Helper to create a test file with given content"""
-    file_path = tmp_path / filename
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    file_path.write_text(content)
-    return file_path
-
-
-def create_docs_directory_structure(tmp_path: Path, files: List[Dict[str, Any]]) -> Path:
-    """Create a mock docs directory structure for testing"""
-    docs_dir = tmp_path / "docs"
-    docs_dir.mkdir(exist_ok=True)
-    
-    # Create subdirectories
-    (docs_dir / "pdf").mkdir(exist_ok=True)
-    (docs_dir / "csv").mkdir(exist_ok=True)
-    (docs_dir / "meeting_minutes").mkdir(exist_ok=True)
-    
-    # Create test files
-    for file_info in files:
-        file_path = docs_dir / file_info["name"]
-        file_path.write_text(file_info["content"])
-    
-    return docs_dir
-
 
 # Agent response validation patterns
 DANGEROUS_RESPONSE_PATTERNS = [
