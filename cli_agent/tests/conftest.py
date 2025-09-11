@@ -7,6 +7,9 @@ module is skipped rather than erroring out.
 import os
 import pytest
 
+# Register our custom plugin
+pytest_plugins = ["pytest_plugin"]
+
 
 @pytest.fixture(autouse=True)
 def _check_api_key() -> None:
