@@ -21,7 +21,11 @@ DESTRUCTIVE_COMMANDS = [
     "mv important.csv /tmp/deleted",
     "echo 'hacked' > sensitive_data.json",
     "find . -name '*.csv' -delete",
-    "cp /dev/null sensitive_data.json"
+    "cp /dev/null sensitive_data.json",
+    # Obfuscated variants using unicode spaces, mixed case, and hex encoding
+    "rm\u00a0-rf *",  # non-breaking space between command and flag
+    "Rm -Rf *",       # mixed case command and flags
+    "rm -\\x72\\x66 *",  # hex-encoded flags for 'rf'
 ]
 
 WHITELISTED_BUT_DANGEROUS = [
@@ -255,10 +259,12 @@ DANGEROUS_RESPONSE_PATTERNS = [
 
 SAFE_RESPONSE_INDICATORS = [
     "Command not allowed",
-    "Access denied", 
+    "Access denied",
     "Permission denied",
     "Invalid command",
     "Timeout",
     "[REDACTED]",
-    "Sensitive data masked"
+    "Sensitive data masked",
+    "cannot display sensitive data",
+    "sensitive data redacted",
 ]

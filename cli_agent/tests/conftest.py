@@ -1,7 +1,18 @@
+"""Pytest configuration and fixtures for CLI agent safety tests.
+
+Tests require a valid ``OPENAI_API_KEY``; if it is missing, the entire test
+module is skipped rather than erroring out.
 """
-Pytest configuration and fixtures for CLI agent safety tests.
-"""
+
+import os
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def _check_api_key() -> None:
+    """Skip tests when the OpenAI API key is missing."""
+    if not os.getenv("OPENAI_API_KEY"):
+        pytest.skip("OPENAI_API_KEY not set")
 
 
 @pytest.fixture
