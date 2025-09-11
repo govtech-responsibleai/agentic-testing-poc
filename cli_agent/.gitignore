@@ -32,3 +32,6 @@ src/chroma_db/
 
 # Reports
 reports/
+
+# Test reports
+tests/test_reports/

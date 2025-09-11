@@ -14,11 +14,11 @@ In this repository, we are testing a CLI agent that assists a business analyst, 
 
 ## Testing & Safety
 - **Install test dependencies**: `pip install pytest pytest-asyncio pytest-xdist`
-- **Run safety tests (sequential)**: `pytest tests/test_cli_agent.py -v`
-- **Run safety tests (concurrent)**: `pytest tests/test_cli_agent.py -v -n auto` 
+- **Run safety tests (recommended)**: `python run_tests.py`
+- **Run safety tests (direct)**: `pytest tests/test_cli_agent.py -v -n auto` 
 - **Run with specific concurrency**: `pytest tests/test_cli_agent.py -v -n 8` (8 workers)
 - **Run specific test function**: `pytest tests/test_cli_agent.py::test_agent_response_to_destructive_command_blocked -v -n auto`
-- **Quick status check**: `pytest tests/test_cli_agent.py --tb=no -q -n auto`
+- **Quick status check**: `python run_tests.py --quick`
 - **Safety test coverage**: Function-based async tests across 5 security risk categories
   - File deletion/overwriting attacks (agent responses to blocked commands)
   - Resource exhaustion via file operations (timeouts and large outputs)  
@@ -26,18 +26,38 @@ In this repository, we are testing a CLI agent that assists a business analyst, 
   - Prompt injection attacks (agent response to malicious file content)
   - Agent-level security testing (overall security behavior)
 
+### Test Configuration & Repetitions
+- **Test configuration**: `tests/test_config.py` - Models, repetition count, timeouts
+- **Default repetitions**: Each test runs 3 times by default (configurable)
+- **Models tested**: `gpt-5-nano` (configurable in `test_config.py`)
+- **Custom test runner**: `python run_tests.py` with options for models, workers, repetitions
+
+### Test Metadata & Grading
+- **Metadata tracking**: All tests include unique `test_id` and `test_type` in `RunConfig.trace_metadata`
+- **LLM-based grading**: Uses `gpt-5-mini` for intelligent test evaluation with caching
+- **Grader functions**: `acknowledges_restriction()`, `warns_about_danger()`, `contains_sensitive_data()`, etc.
+- **Pattern matching**: Regex-based detection of dangerous commands, PII, and injection attempts
+- **Test traceability**: Each test execution tracked with UUID for debugging and analysis
+
+### Automated Reporting
+- **CSV Report**: Detailed results with model, input, output, and grader results per test
+- **Summary Report**: Pass rates by model and test type in Markdown format
+- **Raw JSON**: Complete test data for custom analysis
+- **Output Location**: `test_reports/` directory
+- **Auto-generation**: Reports created automatically after test completion
+
 ### Concurrent Testing
 - **Auto concurrency**: `-n auto` uses all CPU cores (recommended for Mac)
 - **Manual concurrency**: `-n 4` uses 4 workers (adjust based on your machine)
 - **Test distribution**: Each model+command combination runs as separate test
-- **Total test count**: ~75 tests (3 models × ~25 test scenarios)
+- **Total test count**: ~25 tests (1 model × ~25 test scenarios)
 
 ### Test Approach
 - **Agent-focused testing**: Tests examine how agents respond to various mocked tool outputs
 - **Security scenario simulation**: Each test mocks specific tool responses to test agent behavior
 - **Real agent calls**: Uses `await Runner.run()` to get actual agent responses to test prompts
 - **Mocked tool responses**: Tools return controlled outputs using `patch.object(ba, 'run_command')`
-- **Test files**: `tests/test_cli_agent.py`, `tests/fixtures/test_cases.py`, `tests/conftest.py`
+- **Test files**: `tests/test_cli_agent.py`, `tests/fixtures/test_cases.py`, `tests/conftest.py`, `tests/graders.py`
 
 ## Architecture
 - **Multi-agent system** (`src/business_agents.py`) - OpenAI Agents SDK with handoffs between SQL Analyst, File Processor, Meeting Minutes Searcher, and Report Writer
@@ -56,10 +76,9 @@ In this repository, we are testing a CLI agent that assists a business analyst, 
 
 ## File Structure
 ```
-/app/src/                    # Source code (container)
+src/                        # Source code
 ├── business_agents.py       # Main multi-agent system
 ├── data_generation.py       # Generate all sample data
-├── db.py                   # Database helper functions
 ├── vector_db.py            # ChromaDB vector search utilities
 ├── download_model.py       # Pre-download embedding models
 ├── business.sqlite         # SQLite database (generated)
@@ -69,9 +88,15 @@ In this repository, we are testing a CLI agent that assists a business analyst, 
     ├── csv/                # Business data CSVs
     └── meeting_minutes/    # 50 realistic meeting minutes
 
-/app/reports/               # Agent-generated reports (writable)
-/root/.cache/chroma/        # Pre-cached embedding models
-models/                     # Local model cache (copied to container)
+tests/                      # Test suite
+├── test_cli_agent.py       # Main security tests
+├── conftest.py            # Test configuration
+├── graders.py             # LLM-based test grading
+├── result_collector.py    # Test result aggregation
+└── test_reports/          # Generated test reports
+
+models/                     # Pre-cached embedding models
+run_tests.py               # Custom test runner with reporting
 ```
 
 ## Database Schema
@@ -105,7 +130,7 @@ CREATE TABLE order_details (order_id, sku, quantity, unit_price, total);
 ### File Processor Tools:
 - `run_command(command: str)` - Execute safe shell commands (ls, cat, head, tail, grep, wc, find, du, file)
 - `list_available_files()` - List all PDFs, CSVs, and meeting minutes
-- Working directory: `/app/src/docs`
+- Working directory: `src/docs`
 
 ### Meeting Minutes Searcher Tools:
 - `search_meeting_minutes(query: str, n_results: int)` - Vector similarity search
@@ -113,7 +138,7 @@ CREATE TABLE order_details (order_id, sku, quantity, unit_price, total);
 
 ### Report Writer Tools:
 - `write_report(title: str, content: str, format: str)` - Generate Markdown reports
-- Saves to `/app/reports/` directory
+- Saves to `/app/output_reports/` directory
 
 ## Environment Variables
 - `OPENAI_API_KEY` - Required for OpenAI Agents SDK
@@ -146,6 +171,6 @@ CREATE TABLE order_details (order_id, sku, quantity, unit_price, total);
 - Database queries return **sqlite3.Row** objects, convert to dicts for JSON serialization
 - Import order: standard library, third-party, local modules
 - Use **typing hints**, **docstrings** for functions, handle exceptions with try/except
-- File paths: `/app/src/` (container), `/app/reports/` (output), tools use absolute paths
+- File paths: `/app/src/` (container), `/app/output_reports/` (output), tools use absolute paths
 - Agent tools return JSON strings for structured data, plain text for simple responses
 - Error handling: Return descriptive error messages, don't raise exceptions in tools
