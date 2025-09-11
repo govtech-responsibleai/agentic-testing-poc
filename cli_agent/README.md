@@ -40,60 +40,42 @@ This environment includes comprehensive safety tests for CLI agent operations:
 
 ```bash
 # Install test dependencies
-pip install pytest pytest-asyncio
+pip install pytest pytest-asyncio pytest-xdist
 
-# Run all safety tests
-pytest tests/test_cli_agent.py -v
+# Run all safety tests (recommended)
+python run_tests.py
+
+# Run tests with pytest directly
+pytest tests/test_cli_agent.py -v -n auto
 
 # Run specific test category
-pytest tests/test_cli_agent.py::TestFileAgentSafety::test_destructive_commands_blocked -v
+pytest tests/test_cli_agent.py::test_agent_response_to_destructive_command_blocked -v
 ```
 
-### Test Coverage
+### Test Coverage & Features
 
-The safety test suite covers 4 critical security risk categories with 25 tests total:
+- **5 Security Risk Categories** - File deletion, resource exhaustion, PII exposure, prompt injection, agent-level security
+- **~25 Test Scenarios** - Each security risk tested with multiple variations  
+- **LLM-Based Grading** - Uses GPT-4 mini for intelligent test evaluation with caching
+- **Concurrent Testing** - Auto-detects CPU cores for parallel test execution
+- **Comprehensive Reporting** - CSV, Markdown, and JSON reports with pass rates by test type
+- **Configurable Models** - Test against different language models (configured in `tests/test_config.py`)
+- **Metadata Tracking** - Each test execution tracked with UUID for debugging
 
-1. **File Deletion/Overwriting Attacks (3 tests)**
-   - Blocks destructive commands like `rm -rf *`
-   - Prevents dangerous variations of whitelisted commands
-   - Protects against file overwrite via output redirection
+### Test Infrastructure
 
-2. **Resource Exhaustion via File Operations (3 tests)**
-   - Enforces timeout limits on long-running commands
-   - Handles repeated queries for nonexistent files gracefully
-   - Controls large file output to prevent system overload
-
-3. **PII/Sensitive Data Exposure from Files (3 tests)**
-   - Tests exposure of SSNs in CSV files (expected to fail until redaction implemented)
-   - Tests exposure of API keys in JSON files
-   - Tests exposure of medical records and patient data
-
-4. **Prompt Injection Attacks via File Contents (3 tests)**
-   - Prevents execution of commands embedded in file content
-   - Blocks sophisticated prompt injection attempts
-   - Protects against command substitution in displayed files
-
-5. **Agent-Level Security Testing (3 tests)**
-   - Tests agent rejection of dangerous requests
-   - Validates PII handling awareness
-   - Checks prompt injection recognition
-
-### Current Test Status
-
-**✅ Test Infrastructure: Working** (20/25 tests passing)
-- All fixtures and API calls properly implemented
-- Test framework successfully identifies real security issues
-
-**⚠️ Security Vulnerabilities Identified** (5/25 tests failing)
-- Some destructive `find` command variations not blocked
-- Whitelisted commands with dangerous flags need better filtering  
-- Agent-level dangerous request handling needs improvement
+- **Custom Test Runner**: `python run_tests.py` with options for models, workers, repetitions
+- **Automated Reporting**: Test results saved to `test_reports/` with detailed analysis
+- **Pattern Matching**: Regex-based detection of dangerous commands, PII, and injection attempts
+- **Agent-Focused Testing**: Real agent responses to mocked tool outputs for security scenarios
 
 ### Test Files
 
-- `tests/test_cli_agent.py` - Main safety test suite
-- `tests/fixtures/test_cases.py` - Test fixtures and edge cases
-- `tests/conftest.py` - Pytest fixtures for PII and injection test data
+- `tests/test_cli_agent.py` - Main security tests with async agent calls
+- `tests/graders.py` - LLM-based grading functions and pattern matching
+- `tests/conftest.py` - Test configuration and fixtures
+- `tests/result_collector.py` - Test result aggregation and reporting
+- `run_tests.py` - Custom test runner with concurrent execution
 
 ## Agent System
 
@@ -133,12 +115,12 @@ The interactive system allows you to:
 
 ## File Locations
 
-- SQLite database: `/app/src/business.sqlite`
-- PDF files: `/app/src/docs/pdf/`
-- CSV files: `/app/src/docs/csv/`
-- Meeting minutes: `/app/src/docs/meeting_minutes/`
-- Vector database: `/app/src/chroma_db/`
-- Reports output: `/app/reports/`
+- SQLite database: `src/business.sqlite`
+- PDF files: `src/docs/pdf/`
+- CSV files: `src/docs/csv/`
+- Meeting minutes: `src/docs/meeting_minutes/`
+- Vector database: `src/chroma_db/`
+- Reports output: `/app/output_reports/` (in container)
 
 ## Sample Data
 

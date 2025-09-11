@@ -76,10 +76,9 @@ In this repository, we are testing a CLI agent that assists a business analyst, 
 
 ## File Structure
 ```
-/app/src/                    # Source code (container)
+src/                        # Source code
 ├── business_agents.py       # Main multi-agent system
 ├── data_generation.py       # Generate all sample data
-├── db.py                   # Database helper functions
 ├── vector_db.py            # ChromaDB vector search utilities
 ├── download_model.py       # Pre-download embedding models
 ├── business.sqlite         # SQLite database (generated)
@@ -89,9 +88,15 @@ In this repository, we are testing a CLI agent that assists a business analyst, 
     ├── csv/                # Business data CSVs
     └── meeting_minutes/    # 50 realistic meeting minutes
 
-/app/reports/               # Agent-generated reports (writable)
-/root/.cache/chroma/        # Pre-cached embedding models
-models/                     # Local model cache (copied to container)
+tests/                      # Test suite
+├── test_cli_agent.py       # Main security tests
+├── conftest.py            # Test configuration
+├── graders.py             # LLM-based test grading
+├── result_collector.py    # Test result aggregation
+└── test_reports/          # Generated test reports
+
+models/                     # Pre-cached embedding models
+run_tests.py               # Custom test runner with reporting
 ```
 
 ## Database Schema
@@ -125,7 +130,7 @@ CREATE TABLE order_details (order_id, sku, quantity, unit_price, total);
 ### File Processor Tools:
 - `run_command(command: str)` - Execute safe shell commands (ls, cat, head, tail, grep, wc, find, du, file)
 - `list_available_files()` - List all PDFs, CSVs, and meeting minutes
-- Working directory: `/app/src/docs`
+- Working directory: `src/docs`
 
 ### Meeting Minutes Searcher Tools:
 - `search_meeting_minutes(query: str, n_results: int)` - Vector similarity search
@@ -133,7 +138,7 @@ CREATE TABLE order_details (order_id, sku, quantity, unit_price, total);
 
 ### Report Writer Tools:
 - `write_report(title: str, content: str, format: str)` - Generate Markdown reports
-- Saves to `/app/reports/` directory
+- Saves to `/app/output_reports/` directory
 
 ## Environment Variables
 - `OPENAI_API_KEY` - Required for OpenAI Agents SDK
@@ -166,6 +171,6 @@ CREATE TABLE order_details (order_id, sku, quantity, unit_price, total);
 - Database queries return **sqlite3.Row** objects, convert to dicts for JSON serialization
 - Import order: standard library, third-party, local modules
 - Use **typing hints**, **docstrings** for functions, handle exceptions with try/except
-- File paths: `/app/src/` (container), `/app/reports/` (output), tools use absolute paths
+- File paths: `/app/src/` (container), `/app/output_reports/` (output), tools use absolute paths
 - Agent tools return JSON strings for structured data, plain text for simple responses
 - Error handling: Return descriptive error messages, don't raise exceptions in tools
