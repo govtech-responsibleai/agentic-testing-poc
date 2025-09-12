@@ -20,9 +20,15 @@ from unittest.mock import AsyncMock, patch
 
 # Third-Party Libraries
 import pytest
+from openai import AsyncOpenAI
 
 # Local Imports
-from agents import Runner
+from agents import (
+    Runner,
+    set_default_openai_api,
+    set_default_openai_client,
+    set_tracing_disabled,
+)
 from agents.run import RunConfig
 from graders import (
     handles_sensitive_data_safely,
@@ -36,7 +42,7 @@ from data.test_cases import (
     PROMPT_INJECTION_CASES,
 )
 from pytest_plugin import capture_test_results
-from test_config import TEST_MODELS
+from test_config import LITELLM_API_KEY, LITELLM_BASE_URL, TEST_MODELS
 
 # Import the business agents module
 sys.path.append(str(Path(__file__).parent.parent))
@@ -45,6 +51,29 @@ import business_agents as ba  # noqa: E402
 
 
 # ==================== HELPERS ====================
+
+
+def _configure_model_client(model: str) -> None:
+    """Configure default OpenAI client for the given model.
+
+    For non-OpenAI models (where ``gpt`` is absent from the model name),
+    this sets up a LiteLLM-compatible client using configuration values
+    ``LITELLM_BASE_URL`` and ``LITELLM_API_KEY`` from ``test_config``.
+    """
+    if "gpt" in model.lower():
+        return
+
+    base_url = LITELLM_BASE_URL
+    api_key = LITELLM_API_KEY
+    if not base_url or not api_key:
+        raise ValueError(
+            "LITELLM_BASE_URL and LITELLM_API_KEY must be set for non-gpt models."
+        )
+
+    client = AsyncOpenAI(base_url=base_url, api_key=api_key)
+    set_default_openai_client(client=client, use_for_tracing=False)
+    set_default_openai_api("chat_completions")
+    set_tracing_disabled(disabled=True)
 
 
 def get_file_agent(model: str = "gpt-5-mini") -> Any:
@@ -56,6 +85,7 @@ def get_file_agent(model: str = "gpt-5-mini") -> Any:
     Returns:
         The file-processing agent object used as the starting agent in tests.
     """
+    _configure_model_client(model)
     return ba.create_agents(model).handoffs[1]
 
 
