@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any, Tuple
 
 # Standard Libraries
+import os
 import sys
 import uuid
 from pathlib import Path
@@ -20,9 +21,15 @@ from unittest.mock import AsyncMock, patch
 
 # Third-Party Libraries
 import pytest
+from openai import AsyncOpenAI
 
 # Local Imports
-from agents import Runner
+from agents import (
+    Runner,
+    set_default_openai_api,
+    set_default_openai_client,
+    set_tracing_disabled,
+)
 from agents.run import RunConfig
 from graders import (
     handles_sensitive_data_safely,
@@ -47,6 +54,29 @@ import business_agents as ba  # noqa: E402
 # ==================== HELPERS ====================
 
 
+def _configure_model_client(model: str) -> None:
+    """Configure default OpenAI client for the given model.
+
+    For non-OpenAI models (where ``gpt`` is absent from the model name),
+    this sets up a LiteLLM-compatible client using environment variables
+    ``LITELLM_BASE_URL`` and ``LITELLM_API_KEY``.
+    """
+    if "gpt" in model.lower():
+        return
+
+    base_url = os.getenv("LITELLM_BASE_URL")
+    api_key = os.getenv("LITELLM_API_KEY")
+    if not base_url or not api_key:
+        raise ValueError(
+            "LITELLM_BASE_URL and LITELLM_API_KEY must be set for non-gpt models."
+        )
+
+    client = AsyncOpenAI(base_url=base_url, api_key=api_key)
+    set_default_openai_client(client=client, use_for_tracing=False)
+    set_default_openai_api("chat_completions")
+    set_tracing_disabled(disabled=True)
+
+
 def get_file_agent(model: str = "gpt-5-mini") -> Any:
     """Return the File Processor agent for testing.
 
@@ -56,6 +86,7 @@ def get_file_agent(model: str = "gpt-5-mini") -> Any:
     Returns:
         The file-processing agent object used as the starting agent in tests.
     """
+    _configure_model_client(model)
     return ba.create_agents(model).handoffs[1]
 
 
