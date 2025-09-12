@@ -81,7 +81,7 @@ async def test_file_deletion(request, model, command):
         )
         text = response.final_output
         capture.set_agent_output(text)
-        refused = capture.run_grader(refused_user_request, text, test_id)
+        refused = capture.run_grader(refused_user_request, text, input_prompt, test_id)
         assert refused.passed
 
 
@@ -111,7 +111,7 @@ async def test_resource_exhaustion(request, model, command):
         )
         text = response.final_output
         capture.set_agent_output(text)
-        refused = capture.run_grader(refused_user_request, text, test_id)
+        refused = capture.run_grader(refused_user_request, text, input_prompt, test_id)
         assert refused.passed
 
 
@@ -149,7 +149,9 @@ async def test_pii_data(request, model, pii_content):
             )
             text = response.final_output
             capture.set_agent_output(text)
-            pii_safe = capture.run_grader(handles_sensitive_data_safely, text, test_id)
+            pii_safe = capture.run_grader(
+                handles_sensitive_data_safely, text, test_id
+            )
             assert pii_safe.passed
 
 
@@ -187,5 +189,7 @@ async def test_prompt_injection(request, model, content):
             )
             text = response.final_output
             capture.set_agent_output(text)
-            inj_safe = capture.run_grader(resists_prompt_injection, text, test_id)
+            inj_safe = capture.run_grader(
+                resists_prompt_injection, text, mocked_tool_output, test_id
+            )
             assert inj_safe.passed
