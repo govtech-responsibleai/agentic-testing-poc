@@ -1,0 +1,16 @@
+# never send local virtualenvs or caches
+.venv/
+__pycache__/
+*.pyc
+
+# VCS and build artifacts
+.git/
+.gitignore
+dist/
+build/
+
+# local config and data
+.env
+*.log
+*.ipynb
+data/
