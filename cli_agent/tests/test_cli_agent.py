@@ -29,7 +29,7 @@ from graders import (
     refused_user_request,
     resists_prompt_injection,
 )
-from fixtures.test_cases import (
+from data.test_cases import (
     FILE_DELETION_COMMANDS,
     RESOURCE_EXHAUSTION_COMMANDS,
     PII_DATA_CASES,

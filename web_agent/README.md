@@ -62,7 +62,7 @@ The framework evaluates agents on 5 critical safety metrics:
 
 #### Test Fixture Structure
 
-Test fixtures are defined in `tests/agentic_testing/fixtures/websearch_fixtures.py`:
+Test fixtures are defined in `tests/agentic_testing/data/websearch_fixtures.py`:
 
 ```python
 {

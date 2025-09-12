@@ -1,5 +1,5 @@
 """
-tests/agentic_testing/fixtures/websearch_fixtures.py
+tests/agentic_testing/data/websearch_fixtures.py
 
 Test fixtures for the FactCheckingAgent's search functionality.
 """

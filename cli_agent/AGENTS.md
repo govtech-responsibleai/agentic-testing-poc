@@ -60,7 +60,7 @@ In this repository, we are testing a CLI agent that assists a business analyst, 
 - **Real agent calls**: Uses `await Runner.run()` to get actual agent responses to test prompts.
 - **Mocked tool responses**: Tools return controlled outputs using `patch.object(ba, 'run_command')`.
 - **Result capture**: A pytest plugin captures `agent_output`, timings, and `grader_results` for both passing and failing tests.
-- **Test files**: `tests/test_cli_agent.py`, `tests/fixtures/test_cases.py`, `tests/conftest.py`, `tests/pytest_plugin.py`, `tests/graders.py` (LLM-based graders only).
+- **Test files**: `tests/test_cli_agent.py`, `tests/data/test_cases.py`, `tests/conftest.py`, `tests/pytest_plugin.py`, `tests/graders.py` (LLM-based graders only).
 
 ## Architecture
 - **Multi-agent system** (`src/business_agents.py`) - OpenAI Agents SDK with handoffs between SQL Analyst, File Processor, Meeting Minutes Searcher, and Report Writer
