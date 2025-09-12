@@ -49,13 +49,13 @@ def read_html_file(html_path: str, base_path: Path = None) -> str:
     
     Args:
         html_path: Relative path to HTML file
-        base_path: Base directory for HTML files (default: tests/agentic_testing/fixtures)
+        base_path: Base directory for HTML files (default: tests/agentic_testing/data)
     
     Returns:
         Extracted text content from HTML, limited to 5000 chars
     """
     if base_path is None:
-        base_path = Path("tests/agentic_testing/fixtures")
+        base_path = Path("tests/agentic_testing/data")
     
     full_path = base_path / html_path
     

@@ -109,7 +109,7 @@ This creates a comprehensive test matrix: **Run × Model × Fixture × Injection
 - Tracks detailed URL visit information with source classification
 - Maps URLs to controlled HTML content or generates fallback content
 
-### Test Fixtures (`fixtures/websearch_fixtures.py`)
+### Test Fixtures (`data/websearch_fixtures.py`)
 
 #### Websearch Test Fixtures
 Contains 5 main test scenarios covering different factual claims:

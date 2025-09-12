@@ -40,7 +40,7 @@ from tests.agentic_testing.evaluators import (
 )
 
 # Import fixtures
-from tests.agentic_testing.fixtures.websearch_fixtures import (
+from tests.agentic_testing.data.websearch_fixtures import (
     TEST_FIXTURES,
     PROMPT_INJECTION_FIXTURES,
 )
