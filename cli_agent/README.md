@@ -54,28 +54,44 @@ pytest tests/test_cli_agent.py::test_agent_response_to_destructive_command_block
 
 ### Test Coverage & Features
 
-- **5 Security Risk Categories** - File deletion, resource exhaustion, PII exposure, prompt injection, agent-level security
-- **~25 Test Scenarios** - Each security risk tested with multiple variations  
-- **LLM-Based Grading** - Uses GPT-4 mini for intelligent test evaluation with caching
-- **Concurrent Testing** - Auto-detects CPU cores for parallel test execution
-- **Comprehensive Reporting** - CSV, Markdown, and JSON reports with pass rates by test type
-- **Configurable Models** - Test against different language models (configured in `tests/test_config.py`)
-- **Metadata Tracking** - Each test execution tracked with UUID for debugging
+- 5 security risk categories: file deletion, resource exhaustion, PII exposure, prompt injection, agent-level security
+- ~25 test scenarios across categories
+- LLM-based grading with caching
+- Concurrent testing using pytest-xdist
+- Comprehensive reporting: CSV, Markdown, and JSON with pass rates by test type
+- Configurable models (`tests/test_config.py`)
+- Metadata tracking: UUID per test execution
 
 ### Test Infrastructure
 
-- **Custom Test Runner**: `python run_tests.py` with options for models, workers, repetitions
-- **Automated Reporting**: Test results saved to `test_reports/` with detailed analysis
-- **Pattern Matching**: Regex-based detection of dangerous commands, PII, and injection attempts
-- **Agent-Focused Testing**: Real agent responses to mocked tool outputs for security scenarios
+- Custom test runner: `python run_tests.py` with options for models, workers, repetitions
+- Automated reporting to `tests/test_reports/`
+- LLM judges for refusal, PII handling, and injection resistance (Categories A–D); minimal heuristics remain where useful
+- Agent-focused testing of real agent responses to mocked tool outputs
 
 ### Test Files
 
 - `tests/test_cli_agent.py` - Main security tests with async agent calls
-- `tests/graders.py` - LLM-based grading functions and pattern matching
+- `tests/pytest_plugin.py` - Pytest plugin that captures `agent_output`, timings, and `grader_results`
+- `tests/graders.py` - LLM-based grading functions (regex graders removed)
 - `tests/conftest.py` - Test configuration and fixtures
 - `tests/result_collector.py` - Test result aggregation and reporting
 - `run_tests.py` - Custom test runner with concurrent execution
+
+### Reporting Outputs
+
+- CSV: columns include `test_id`, `test_type`, `run_num`, `model`, `input_prompt`, `agent_output`, `passed`, `failure_reason`, `grader_results` (JSON), `execution_time`, `timestamp`.
+- CSV encoding: files are written with `utf-8-sig` (BOM) to open cleanly in Excel.
+- Summary Markdown: pass rates by model and test type.
+- Raw JSON: full results for analysis.
+- Failing tests: `agent_output` and `failure_reason` are always logged.
+
+### Repetitions and Configuration
+
+- Default repetitions: each test runs 3 times.
+- Override repetitions: set `TEST_REPETITIONS`, e.g. `TEST_REPETITIONS=5 pytest tests/test_cli_agent.py -v -n auto`.
+- Via runner: `python run_tests.py --repetitions 5` (also supports `--models` and `--workers`).
+- Other env overrides: `TEST_MODELS` (comma-separated), `DEFAULT_WORKERS`.
 
 ## Agent System
 
