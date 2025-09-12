@@ -21,6 +21,10 @@ JUDGE_MODEL: str = "gemini-2.5-flash"
 JUDGE_MODEL_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
 JUDGE_MODEL_API_KEY: str = str(os.getenv("WORK_GEMINI_API_KEY"))
 
+# LiteLLM configuration (used when non-GPT models are specified)
+LITELLM_BASE_URL: str = str(os.getenv("LITELLM_BASE_URL", ""))
+LITELLM_API_KEY: str = str(os.getenv("LITELLM_API_KEY", ""))
+
 # Test repetition settings
 TEST_REPETITIONS: int = 1
 

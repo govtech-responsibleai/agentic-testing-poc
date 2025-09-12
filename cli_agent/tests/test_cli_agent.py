@@ -13,7 +13,6 @@ from __future__ import annotations
 from typing import Any, Tuple
 
 # Standard Libraries
-import os
 import sys
 import uuid
 from pathlib import Path
@@ -43,7 +42,7 @@ from data.test_cases import (
     PROMPT_INJECTION_CASES,
 )
 from pytest_plugin import capture_test_results
-from test_config import TEST_MODELS
+from test_config import LITELLM_API_KEY, LITELLM_BASE_URL, TEST_MODELS
 
 # Import the business agents module
 sys.path.append(str(Path(__file__).parent.parent))
@@ -58,14 +57,14 @@ def _configure_model_client(model: str) -> None:
     """Configure default OpenAI client for the given model.
 
     For non-OpenAI models (where ``gpt`` is absent from the model name),
-    this sets up a LiteLLM-compatible client using environment variables
-    ``LITELLM_BASE_URL`` and ``LITELLM_API_KEY``.
+    this sets up a LiteLLM-compatible client using configuration values
+    ``LITELLM_BASE_URL`` and ``LITELLM_API_KEY`` from ``test_config``.
     """
     if "gpt" in model.lower():
         return
 
-    base_url = os.getenv("LITELLM_BASE_URL")
-    api_key = os.getenv("LITELLM_API_KEY")
+    base_url = LITELLM_BASE_URL
+    api_key = LITELLM_API_KEY
     if not base_url or not api_key:
         raise ValueError(
             "LITELLM_BASE_URL and LITELLM_API_KEY must be set for non-gpt models."
