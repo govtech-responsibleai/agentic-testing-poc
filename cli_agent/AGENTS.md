@@ -27,24 +27,26 @@ In this repository, we are testing a CLI agent that assists a business analyst, 
   - Agent-level security testing (overall security behavior)
 
 ### Test Configuration & Repetitions
-- **Test configuration**: `tests/test_config.py` - Models, repetition count, timeouts
+- **Test configuration**: `tests/test_config.py` — models, repetition count, timeouts
 - **Default repetitions**: Each test runs 3 times by default (configurable)
-- **Models tested**: `gpt-5-nano` (configurable in `test_config.py`)
-- **Custom test runner**: `python run_tests.py` with options for models, workers, repetitions
+- **Override via env**: `TEST_REPETITIONS=5`, `TEST_MODELS=gpt-5-nano,gpt-5-mini`, `DEFAULT_WORKERS=auto|8`
+- **Runner flags**: `python run_tests.py --repetitions 5 --models gpt-5-nano gpt-5-mini --workers auto`
+- **Models tested**: defaults to `gpt-5-nano` when unset
 
 ### Test Metadata & Grading
-- **Metadata tracking**: All tests include unique `test_id` and `test_type` in `RunConfig.trace_metadata`
-- **LLM-based grading**: Uses `gpt-5-mini` for intelligent test evaluation with caching
-- **Grader functions**: `acknowledges_restriction()`, `warns_about_danger()`, `contains_sensitive_data()`, etc.
-- **Pattern matching**: Regex-based detection of dangerous commands, PII, and injection attempts
-- **Test traceability**: Each test execution tracked with UUID for debugging and analysis
+- **Metadata tracking**: All tests include unique `test_id` and `test_type` in `RunConfig.trace_metadata`.
+- **LLM-based grading**: Uses `gpt-5-mini` with caching for refusal classification, PII/sensitive data handling, and prompt-injection resistance (Categories A–D).
+- **Grader results format**: All grader outputs are stored under a single JSON mapping column named `grader_results` (keyed by grader name). There are no flattened fields like `refused_user_request.passed` or `.summary`.
+- **Regex graders removed**: Legacy regex-based graders for PII/injection/dangerous patterns have been removed in favor of LLM judges. Lightweight heuristics remain in tests where helpful.
+- **Traceability**: Each test execution tracked with UUID for debugging and analysis.
 
 ### Automated Reporting
-- **CSV Report**: Detailed results with model, input, output, and grader results per test
-- **Summary Report**: Pass rates by model and test type in Markdown format
-- **Raw JSON**: Complete test data for custom analysis
-- **Output Location**: `test_reports/` directory
-- **Auto-generation**: Reports created automatically after test completion
+- **CSV report**: Includes `test_id`, `test_type`, `run_num`, `model`, `input_prompt`, `agent_output`, `passed`, `failure_reason`, `grader_results` (JSON), `execution_time`, `timestamp`.
+- **CSV encoding**: Written as `utf-8-sig` for Excel compatibility.
+- **Summary report**: Markdown with pass rates by model and test type.
+- **Raw JSON**: Full raw results for custom analysis.
+- **Output location**: `tests/test_reports/` directory.
+- **Auto-generation**: Reports are created automatically at session end. Failing tests always capture and log `agent_output` and `failure_reason`.
 
 ### Concurrent Testing
 - **Auto concurrency**: `-n auto` uses all CPU cores (recommended for Mac)
@@ -53,11 +55,12 @@ In this repository, we are testing a CLI agent that assists a business analyst, 
 - **Total test count**: ~25 tests (1 model × ~25 test scenarios)
 
 ### Test Approach
-- **Agent-focused testing**: Tests examine how agents respond to various mocked tool outputs
-- **Security scenario simulation**: Each test mocks specific tool responses to test agent behavior
-- **Real agent calls**: Uses `await Runner.run()` to get actual agent responses to test prompts
-- **Mocked tool responses**: Tools return controlled outputs using `patch.object(ba, 'run_command')`
-- **Test files**: `tests/test_cli_agent.py`, `tests/fixtures/test_cases.py`, `tests/conftest.py`, `tests/graders.py`
+- **Agent-focused testing**: Tests examine how agents respond to various mocked tool outputs.
+- **Security scenario simulation**: Each test mocks specific tool responses to test agent behavior.
+- **Real agent calls**: Uses `await Runner.run()` to get actual agent responses to test prompts.
+- **Mocked tool responses**: Tools return controlled outputs using `patch.object(ba, 'run_command')`.
+- **Result capture**: A pytest plugin captures `agent_output`, timings, and `grader_results` for both passing and failing tests.
+- **Test files**: `tests/test_cli_agent.py`, `tests/fixtures/test_cases.py`, `tests/conftest.py`, `tests/pytest_plugin.py`, `tests/graders.py` (LLM-based graders only).
 
 ## Architecture
 - **Multi-agent system** (`src/business_agents.py`) - OpenAI Agents SDK with handoffs between SQL Analyst, File Processor, Meeting Minutes Searcher, and Report Writer
