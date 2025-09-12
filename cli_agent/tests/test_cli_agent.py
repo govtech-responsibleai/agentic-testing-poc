@@ -42,7 +42,13 @@ from data.test_cases import (
     PROMPT_INJECTION_CASES,
 )
 from pytest_plugin import capture_test_results
-from test_config import LITELLM_API_KEY, LITELLM_BASE_URL, TEST_MODELS
+from test_config import (
+    HF_API_KEY,
+    HF_BASE_URL,
+    LITELLM_API_KEY,
+    LITELLM_BASE_URL,
+    TEST_MODELS,
+)
 
 # Import the business agents module
 sys.path.append(str(Path(__file__).parent.parent))
@@ -58,9 +64,27 @@ def _configure_model_client(model: str) -> None:
 
     For non-OpenAI models (where ``gpt`` is absent from the model name),
     this sets up a LiteLLM-compatible client using configuration values
-    ``LITELLM_BASE_URL`` and ``LITELLM_API_KEY`` from ``test_config``.
+    ``LITELLM_BASE_URL`` and ``LITELLM_API_KEY`` from ``test_config``. If the
+    model name contains one of the following vendor identifiers:
+    ``fireworks-ai``, ``novita``, ``cerebras``, or ``together``, the Hugging
+    Face inference endpoint is used instead with ``HF_BASE_URL`` and
+    ``HF_API_KEY``.
     """
     if "gpt" in model.lower():
+        return
+
+    hf_vendors = ("fireworks-ai", "novita", "cerebras", "together")
+    if any(vendor in model.lower() for vendor in hf_vendors):
+        if not HF_API_KEY:
+            raise ValueError("HF_API_KEY must be set for HuggingFace-hosted models.")
+        client = AsyncOpenAI(
+            base_url=HF_BASE_URL,
+            api_key=HF_API_KEY,
+            default_headers={"X-HF-Bill-To": "govtech"},
+        )
+        set_default_openai_client(client=client, use_for_tracing=False)
+        set_default_openai_api("chat_completions")
+        set_tracing_disabled(disabled=True)
         return
 
     base_url = LITELLM_BASE_URL

@@ -20,6 +20,10 @@ TEST_MODELS: list[str] = [
     "gemini-2.5-pro",
     "apac.anthropic.claude-sonnet-4-20250514-v1:0",
     "us.anthropic.claude-opus-4-1-20250805-v1:0",
+    "zai-org/GLM-4.5:fireworks-ai",
+    "deepseek-ai/DeepSeek-V3.1:novita",
+    "Qwen/Qwen3-235B-A22B-Instruct-2507:cerebras",
+    "moonshotai/Kimi-K2-Instruct-0905:together",
 ]
 
 JUDGE_MODEL: str = "gemini-2.5-flash"
@@ -29,6 +33,10 @@ JUDGE_MODEL_API_KEY: str = str(os.getenv("WORK_GEMINI_API_KEY"))
 # LiteLLM configuration (used when non-GPT models are specified)
 LITELLM_BASE_URL: str = str(os.getenv("AIP_LITELLM_BASE_URL", ""))
 LITELLM_API_KEY: str = str(os.getenv("AIP_LITELLM_API_KEY", ""))
+
+# Hugging Face configuration
+HF_API_KEY: str = str(os.getenv("HF_API_KEY", ""))
+HF_BASE_URL: str = "https://router.huggingface.co/v1"
 
 # Test repetition settings
 TEST_REPETITIONS: int = 1
