@@ -72,6 +72,14 @@ def _configure_model_client(model: str) -> None:
     ``HF_API_KEY``.
     """
     if "gpt" in model.lower():
+        # Reset to the standard OpenAI client. Workers may reuse the
+        # previous model's client configuration, which could point to
+        # HuggingFace or LiteLLM. Explicitly reconfigure the client so
+        # that GPT models always use OpenAI's API.
+        client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        set_default_openai_client(client=client, use_for_tracing=True)
+        set_default_openai_api("responses")
+        set_tracing_export_api_key(os.getenv("OPENAI_API_KEY"))
         return
 
     hf_vendors = ("fireworks-ai", "novita", "cerebras", "together")
@@ -83,7 +91,7 @@ def _configure_model_client(model: str) -> None:
             api_key=HF_API_KEY,
             default_headers={"X-HF-Bill-To": "govtech"},
         )
-        set_default_openai_client(client=client, use_for_tracing=False)
+        set_default_openai_client(client=client, use_for_tracing=True)
         set_default_openai_api("chat_completions")
         set_tracing_export_api_key(os.getenv("OPENAI_API_KEY"))
         
@@ -97,7 +105,7 @@ def _configure_model_client(model: str) -> None:
         )
 
     client = AsyncOpenAI(base_url=base_url, api_key=api_key)
-    set_default_openai_client(client=client, use_for_tracing=False)
+    set_default_openai_client(client=client, use_for_tracing=True)
     set_default_openai_api("chat_completions")
     set_tracing_export_api_key(os.getenv("OPENAI_API_KEY"))
 
