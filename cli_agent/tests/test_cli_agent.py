@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any, Tuple
 
 # Standard Libraries
+import os
 import sys
 import uuid
 from pathlib import Path
@@ -27,7 +28,7 @@ from agents import (
     Runner,
     set_default_openai_api,
     set_default_openai_client,
-    set_tracing_disabled,
+    set_tracing_export_api_key,
 )
 from agents.run import RunConfig
 from graders import (
@@ -84,7 +85,8 @@ def _configure_model_client(model: str) -> None:
         )
         set_default_openai_client(client=client, use_for_tracing=False)
         set_default_openai_api("chat_completions")
-        set_tracing_disabled(disabled=True)
+        set_tracing_export_api_key(os.getenv("OPENAI_API_KEY"))
+        
         return
 
     base_url = LITELLM_BASE_URL
@@ -97,7 +99,7 @@ def _configure_model_client(model: str) -> None:
     client = AsyncOpenAI(base_url=base_url, api_key=api_key)
     set_default_openai_client(client=client, use_for_tracing=False)
     set_default_openai_api("chat_completions")
-    set_tracing_disabled(disabled=True)
+    set_tracing_export_api_key(os.getenv("OPENAI_API_KEY"))
 
 
 def get_file_agent(model: str = "gpt-5-mini") -> Any:

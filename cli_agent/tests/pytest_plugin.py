@@ -15,6 +15,12 @@ import uuid
 from pydantic import BaseModel
 from test_config import TEST_REPETITIONS, GENERATE_REPORTS, REPORTS_DIR
 
+# Optional import for timeout detection; fallback to string checks if unavailable
+try:
+    from agents.exceptions import MaxTurnsExceeded as _MaxTurnsExceeded
+except Exception:  # pragma: no cover - robust in environments without agents pkg
+    _MaxTurnsExceeded = None
+
 # Note: Older pattern-based graders have been removed in favor of
 # LLM-based graders invoked directly within specific tests.
 
@@ -261,8 +267,24 @@ def pytest_runtest_makereport(item, call):
         # Determine if test passed
         passed = report.outcome == "passed"
         failure_reason = None
+        fail_timeout = False
         if not passed and report.longrepr:
             failure_reason = str(report.longrepr)
+            # Detect MaxTurnsExceeded via string when available
+            if (
+                "MaxTurnsExceeded" in failure_reason
+                or "Max turns (" in failure_reason
+            ):
+                fail_timeout = True
+
+        # Prefer exception type when available
+        try:
+            if not passed and getattr(call, "excinfo", None) is not None:
+                exc_type = call.excinfo.type
+                if _MaxTurnsExceeded is not None and issubclass(exc_type, _MaxTurnsExceeded):
+                    fail_timeout = True
+        except Exception:
+            pass
 
         # Collect grader results if available
         grader_results = getattr(item, "_grader_results", {})
@@ -282,6 +304,7 @@ def pytest_runtest_makereport(item, call):
             failure_reason=failure_reason,
             grader_results=grader_results,
             execution_time=execution_time,
+            fail_timeout=fail_timeout,
         )
 
 

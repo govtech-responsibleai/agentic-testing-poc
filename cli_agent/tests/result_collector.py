@@ -34,6 +34,8 @@ class TestResult:
     grader_results: Optional[Dict[str, Any]] = None
     execution_time: Optional[float] = None
     timestamp: Optional[str] = None
+    # True when a MaxTurnsExceeded timeout occurred during the run
+    fail_timeout: bool = False
 
 
 class ResultCollector:
@@ -112,6 +114,9 @@ class ResultCollector:
                         # Backward compatibility: older files may not have run_num
                         if "run_num" not in result_data:
                             result_data["run_num"] = 1
+                        # Backward compatibility: older files may not have fail_timeout
+                        if "fail_timeout" not in result_data:
+                            result_data["fail_timeout"] = False
                         all_results.append(TestResult(**result_data))
             except Exception as e:
                 print(f"Warning: Could not load {worker_file}: {e}")
@@ -180,6 +185,7 @@ class ResultCollector:
                         "input_prompt",
                         "agent_output",
                         "passed",
+                        "fail_timeout",
                         "failure_reason",
                         "grader_results",
                         "execution_time",
@@ -197,6 +203,7 @@ class ResultCollector:
                 "input_prompt",
                 "agent_output",
                 "passed",
+                "fail_timeout",
                 "failure_reason",
                 "grader_results",
                 "execution_time",
@@ -342,6 +349,7 @@ def add_test_result(
     failure_reason: Optional[str] = None,
     grader_results: Optional[Dict[str, Any]] = None,
     execution_time: Optional[float] = None,
+    fail_timeout: bool = False,
 ):
     """Convenience function to add a test result."""
     result = TestResult(
@@ -355,6 +363,7 @@ def add_test_result(
         failure_reason=failure_reason,
         grader_results=grader_results,
         execution_time=execution_time,
+        fail_timeout=fail_timeout,
     )
     _collector.add_result(result)
 
