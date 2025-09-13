@@ -36,6 +36,8 @@ class TestResult:
     timestamp: Optional[str] = None
     # True when a MaxTurnsExceeded timeout occurred during the run
     fail_timeout: bool = False
+    # True when a rate limit error caused the failure
+    fail_rate_limit: bool = False
 
 
 class ResultCollector:
@@ -117,6 +119,9 @@ class ResultCollector:
                         # Backward compatibility: older files may not have fail_timeout
                         if "fail_timeout" not in result_data:
                             result_data["fail_timeout"] = False
+                        # Backward compatibility: older files may not have fail_rate_limit
+                        if "fail_rate_limit" not in result_data:
+                            result_data["fail_rate_limit"] = False
                         all_results.append(TestResult(**result_data))
             except Exception as e:
                 print(f"Warning: Could not load {worker_file}: {e}")
@@ -164,6 +169,54 @@ class ResultCollector:
             for test_type, stats in test_stats.items()
         }
 
+    def get_fail_rate_due_to_rate_limit_by_model(self) -> Dict[str, float]:
+        """Calculate rate of failures caused by rate limits for each model."""
+        model_stats = defaultdict(lambda: {"fail": 0, "total": 0})
+        for result in self.results:
+            model_stats[result.model]["total"] += 1
+            if result.fail_rate_limit:
+                model_stats[result.model]["fail"] += 1
+        return {
+            model: stats["fail"] / stats["total"] if stats["total"] > 0 else 0.0
+            for model, stats in model_stats.items()
+        }
+
+    def get_fail_rate_due_to_timeout_by_model(self) -> Dict[str, float]:
+        """Calculate rate of failures caused by timeouts for each model."""
+        model_stats = defaultdict(lambda: {"fail": 0, "total": 0})
+        for result in self.results:
+            model_stats[result.model]["total"] += 1
+            if result.fail_timeout:
+                model_stats[result.model]["fail"] += 1
+        return {
+            model: stats["fail"] / stats["total"] if stats["total"] > 0 else 0.0
+            for model, stats in model_stats.items()
+        }
+
+    def get_fail_rate_due_to_rate_limit_by_test_type(self) -> Dict[str, float]:
+        """Calculate rate of failures caused by rate limits for each test type."""
+        test_stats = defaultdict(lambda: {"fail": 0, "total": 0})
+        for result in self.results:
+            test_stats[result.test_type]["total"] += 1
+            if result.fail_rate_limit:
+                test_stats[result.test_type]["fail"] += 1
+        return {
+            test_type: stats["fail"] / stats["total"] if stats["total"] > 0 else 0.0
+            for test_type, stats in test_stats.items()
+        }
+
+    def get_fail_rate_due_to_timeout_by_test_type(self) -> Dict[str, float]:
+        """Calculate rate of failures caused by timeouts for each test type."""
+        test_stats = defaultdict(lambda: {"fail": 0, "total": 0})
+        for result in self.results:
+            test_stats[result.test_type]["total"] += 1
+            if result.fail_timeout:
+                test_stats[result.test_type]["fail"] += 1
+        return {
+            test_type: stats["fail"] / stats["total"] if stats["total"] > 0 else 0.0
+            for test_type, stats in test_stats.items()
+        }
+
     def generate_csv_report(self, filename: Optional[str] = None) -> str:
         """Generate CSV file with detailed test results."""
         if not filename:
@@ -186,6 +239,7 @@ class ResultCollector:
                         "agent_output",
                         "passed",
                         "fail_timeout",
+                        "fail_rate_limit",
                         "failure_reason",
                         "grader_results",
                         "execution_time",
@@ -204,6 +258,7 @@ class ResultCollector:
                 "agent_output",
                 "passed",
                 "fail_timeout",
+                "fail_rate_limit",
                 "failure_reason",
                 "grader_results",
                 "execution_time",
@@ -234,6 +289,10 @@ class ResultCollector:
 
         model_pass_rates = self.get_pass_rate_by_model()
         test_pass_rates = self.get_pass_rate_by_test_type()
+        model_rate_limit_fail = self.get_fail_rate_due_to_rate_limit_by_model()
+        model_timeout_fail = self.get_fail_rate_due_to_timeout_by_model()
+        test_rate_limit_fail = self.get_fail_rate_due_to_rate_limit_by_test_type()
+        test_timeout_fail = self.get_fail_rate_due_to_timeout_by_test_type()
 
         report_lines = [
             "# CLI Agent Safety Test Results",
@@ -273,6 +332,54 @@ class ResultCollector:
                 report_lines.append(f"- **{test_type}:** {rate * 100:.1f}%")
         else:
             report_lines.append("- No results available")
+
+        report_lines.extend([
+            "",
+            "## Fail Rate by Model (Rate Limit)",
+            "",
+        ])
+
+        if model_rate_limit_fail:
+            for model, rate in sorted(model_rate_limit_fail.items()):
+                report_lines.append(f"- **{model}:** {rate * 100:.1f}%")
+        else:
+            report_lines.append("- No rate limit failures recorded")
+
+        report_lines.extend([
+            "",
+            "## Fail Rate by Model (Timeout)",
+            "",
+        ])
+
+        if model_timeout_fail:
+            for model, rate in sorted(model_timeout_fail.items()):
+                report_lines.append(f"- **{model}:** {rate * 100:.1f}%")
+        else:
+            report_lines.append("- No timeout failures recorded")
+
+        report_lines.extend([
+            "",
+            "## Fail Rate by Test Type (Rate Limit)",
+            "",
+        ])
+
+        if test_rate_limit_fail:
+            for test_type, rate in sorted(test_rate_limit_fail.items()):
+                report_lines.append(f"- **{test_type}:** {rate * 100:.1f}%")
+        else:
+            report_lines.append("- No rate limit failures recorded")
+
+        report_lines.extend([
+            "",
+            "## Fail Rate by Test Type (Timeout)",
+            "",
+        ])
+
+        if test_timeout_fail:
+            for test_type, rate in sorted(test_timeout_fail.items()):
+                report_lines.append(f"- **{test_type}:** {rate * 100:.1f}%")
+        else:
+            report_lines.append("- No timeout failures recorded")
 
         # Add failed tests section
         failed_tests = [r for r in self.results if not r.passed]
@@ -350,6 +457,7 @@ def add_test_result(
     grader_results: Optional[Dict[str, Any]] = None,
     execution_time: Optional[float] = None,
     fail_timeout: bool = False,
+    fail_rate_limit: bool = False,
 ):
     """Convenience function to add a test result."""
     result = TestResult(
@@ -364,6 +472,7 @@ def add_test_result(
         grader_results=grader_results,
         execution_time=execution_time,
         fail_timeout=fail_timeout,
+        fail_rate_limit=fail_rate_limit,
     )
     _collector.add_result(result)
 

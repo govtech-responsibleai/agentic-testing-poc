@@ -13,15 +13,18 @@ from __future__ import annotations
 from typing import Any, Tuple
 
 # Standard Libraries
+import asyncio
 import os
 import sys
 import uuid
+from collections.abc import Awaitable, Callable
+from functools import wraps
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 # Third-Party Libraries
+from openai import AsyncOpenAI, RateLimitError
 import pytest
-from openai import AsyncOpenAI
 
 # Local Imports
 from agents import (
@@ -142,6 +145,45 @@ def generate_test_id() -> str:
     return str(uuid.uuid4())
 
 
+RETRY_DELAYS: list[int] = [10, 30, 60, 60]
+
+
+def _is_rate_limit_error(err: Exception) -> bool:
+    """Determine whether the given exception indicates a rate limit.
+
+    Args:
+        err: Exception instance raised during the test.
+
+    Returns:
+        True if the error is a rate limit related issue.
+    """
+    message = str(err).lower()
+    keywords = ("429", "rate limit", "rate-limit", "too many requests", "quota")
+    return isinstance(err, RateLimitError) or any(key in message for key in keywords)
+
+
+def rate_limit_retry(
+    test_func: Callable[..., Awaitable[None]],
+) -> Callable[..., Awaitable[None]]:
+    """Retry the wrapped async test on rate limit related errors.
+
+    Waits for 10/30/60/60 seconds between attempts and gives up after five tries.
+    """
+
+    @wraps(test_func)
+    async def wrapper(*args: Any, **kwargs: Any) -> None:
+        for attempt in range(len(RETRY_DELAYS) + 1):
+            try:
+                await test_func(*args, **kwargs)
+                return
+            except Exception as err:
+                if not _is_rate_limit_error(err) or attempt == len(RETRY_DELAYS):
+                    raise
+                await asyncio.sleep(RETRY_DELAYS[attempt])
+
+    return wrapper
+
+
 @pytest.fixture
 def llm_model(request: pytest.FixtureRequest) -> str:
     """Provide the LLM model name via indirect parametrization.
@@ -166,6 +208,7 @@ def llm_model(request: pytest.FixtureRequest) -> str:
 @pytest.mark.parametrize("llm_model", TEST_MODELS, indirect=True, ids=lambda m: m)
 @pytest.mark.parametrize("command", FILE_DELETION_COMMANDS, ids=lambda s: s)
 @pytest.mark.asyncio
+@rate_limit_retry
 async def test_file_deletion(
     request: pytest.FixtureRequest, llm_model: str, command: str
 ) -> None:
@@ -199,6 +242,7 @@ async def test_file_deletion(
 @pytest.mark.parametrize("llm_model", TEST_MODELS, indirect=True, ids=lambda m: m)
 @pytest.mark.parametrize("command", RESOURCE_EXHAUSTION_COMMANDS, ids=lambda s: s)
 @pytest.mark.asyncio
+@rate_limit_retry
 async def test_resource_exhaustion(
     request: pytest.FixtureRequest, llm_model: str, command: str
 ) -> None:
@@ -232,6 +276,7 @@ async def test_resource_exhaustion(
 @pytest.mark.parametrize("llm_model", TEST_MODELS, indirect=True, ids=lambda m: m)
 @pytest.mark.parametrize("pii_content", PII_DATA_CASES, ids=lambda t: t[0])
 @pytest.mark.asyncio
+@rate_limit_retry
 async def test_pii_data(
     request: pytest.FixtureRequest,
     llm_model: str,
@@ -274,6 +319,7 @@ async def test_pii_data(
 @pytest.mark.parametrize("llm_model", TEST_MODELS, indirect=True, ids=lambda m: m)
 @pytest.mark.parametrize("content", PROMPT_INJECTION_CASES, ids=lambda t: t[0])
 @pytest.mark.asyncio
+@rate_limit_retry
 async def test_prompt_injection(
     request: pytest.FixtureRequest,
     llm_model: str,

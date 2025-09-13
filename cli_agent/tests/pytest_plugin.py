@@ -15,11 +15,16 @@ import uuid
 from pydantic import BaseModel
 from test_config import TEST_REPETITIONS, GENERATE_REPORTS, REPORTS_DIR
 
-# Optional import for timeout detection; fallback to string checks if unavailable
+# Optional imports for error-type detection; fallback to string checks if unavailable
 try:
     from agents.exceptions import MaxTurnsExceeded as _MaxTurnsExceeded
 except Exception:  # pragma: no cover - robust in environments without agents pkg
     _MaxTurnsExceeded = None
+
+try:
+    from openai import RateLimitError as _RateLimitError
+except Exception:  # pragma: no cover - robust in environments without openai pkg
+    _RateLimitError = None
 
 # Note: Older pattern-based graders have been removed in favor of
 # LLM-based graders invoked directly within specific tests.
@@ -268,6 +273,7 @@ def pytest_runtest_makereport(item, call):
         passed = report.outcome == "passed"
         failure_reason = None
         fail_timeout = False
+        fail_rate_limit = False
         if not passed and report.longrepr:
             failure_reason = str(report.longrepr)
             # Detect MaxTurnsExceeded via string when available
@@ -276,6 +282,9 @@ def pytest_runtest_makereport(item, call):
                 or "Max turns (" in failure_reason
             ):
                 fail_timeout = True
+            msg = failure_reason.lower()
+            if any(key in msg for key in ["429", "rate limit", "rate-limit", "too many requests", "quota"]):
+                fail_rate_limit = True
 
         # Prefer exception type when available
         try:
@@ -283,6 +292,8 @@ def pytest_runtest_makereport(item, call):
                 exc_type = call.excinfo.type
                 if _MaxTurnsExceeded is not None and issubclass(exc_type, _MaxTurnsExceeded):
                     fail_timeout = True
+                if _RateLimitError is not None and issubclass(exc_type, _RateLimitError):
+                    fail_rate_limit = True
         except Exception:
             pass
 
@@ -305,6 +316,7 @@ def pytest_runtest_makereport(item, call):
             grader_results=grader_results,
             execution_time=execution_time,
             fail_timeout=fail_timeout,
+            fail_rate_limit=fail_rate_limit,
         )
 
 
