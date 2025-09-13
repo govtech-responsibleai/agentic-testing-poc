@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any, Tuple
 
 # Standard Libraries
+import os
 import sys
 import uuid
 from pathlib import Path
@@ -27,7 +28,7 @@ from agents import (
     Runner,
     set_default_openai_api,
     set_default_openai_client,
-    set_tracing_disabled,
+    set_tracing_export_api_key,
 )
 from agents.run import RunConfig
 from graders import (
@@ -42,7 +43,13 @@ from data.test_cases import (
     PROMPT_INJECTION_CASES,
 )
 from pytest_plugin import capture_test_results
-from test_config import LITELLM_API_KEY, LITELLM_BASE_URL, TEST_MODELS
+from test_config import (
+    HF_API_KEY,
+    HF_BASE_URL,
+    LITELLM_API_KEY,
+    LITELLM_BASE_URL,
+    TEST_MODELS,
+)
 
 # Import the business agents module
 sys.path.append(str(Path(__file__).parent.parent))
@@ -58,9 +65,28 @@ def _configure_model_client(model: str) -> None:
 
     For non-OpenAI models (where ``gpt`` is absent from the model name),
     this sets up a LiteLLM-compatible client using configuration values
-    ``LITELLM_BASE_URL`` and ``LITELLM_API_KEY`` from ``test_config``.
+    ``LITELLM_BASE_URL`` and ``LITELLM_API_KEY`` from ``test_config``. If the
+    model name contains one of the following vendor identifiers:
+    ``fireworks-ai``, ``novita``, ``cerebras``, or ``together``, the Hugging
+    Face inference endpoint is used instead with ``HF_BASE_URL`` and
+    ``HF_API_KEY``.
     """
     if "gpt" in model.lower():
+        return
+
+    hf_vendors = ("fireworks-ai", "novita", "cerebras", "together")
+    if any(vendor in model.lower() for vendor in hf_vendors):
+        if not HF_API_KEY:
+            raise ValueError("HF_API_KEY must be set for HuggingFace-hosted models.")
+        client = AsyncOpenAI(
+            base_url=HF_BASE_URL,
+            api_key=HF_API_KEY,
+            default_headers={"X-HF-Bill-To": "govtech"},
+        )
+        set_default_openai_client(client=client, use_for_tracing=False)
+        set_default_openai_api("chat_completions")
+        set_tracing_export_api_key(os.getenv("OPENAI_API_KEY"))
+        
         return
 
     base_url = LITELLM_BASE_URL
@@ -73,7 +99,7 @@ def _configure_model_client(model: str) -> None:
     client = AsyncOpenAI(base_url=base_url, api_key=api_key)
     set_default_openai_client(client=client, use_for_tracing=False)
     set_default_openai_api("chat_completions")
-    set_tracing_disabled(disabled=True)
+    set_tracing_export_api_key(os.getenv("OPENAI_API_KEY"))
 
 
 def get_file_agent(model: str = "gpt-5-mini") -> Any:
@@ -84,8 +110,18 @@ def get_file_agent(model: str = "gpt-5-mini") -> Any:
 
     Returns:
         The file-processing agent object used as the starting agent in tests.
+
+    Notes:
+        Hugging Face hosted models (vendors containing "fireworks-ai", "novita",
+        "cerebras", or "together") are prefixed with ``openai/`` so that the
+        ``MultiProvider`` routes them through the OpenAI provider.
     """
     _configure_model_client(model)
+
+    hf_vendors = ("fireworks-ai", "novita", "cerebras", "together")
+    if any(vendor in model.lower() for vendor in hf_vendors):
+        model = f"openai/{model}"
+
     return ba.create_agents(model).handoffs[1]
 
 
