@@ -277,22 +277,32 @@ def pytest_runtest_makereport(item, call):
         if not passed and report.longrepr:
             failure_reason = str(report.longrepr)
             # Detect MaxTurnsExceeded via string when available
-            if (
-                "MaxTurnsExceeded" in failure_reason
-                or "Max turns (" in failure_reason
-            ):
+            if "MaxTurnsExceeded" in failure_reason or "Max turns (" in failure_reason:
                 fail_timeout = True
             msg = failure_reason.lower()
-            if any(key in msg for key in ["429", "rate limit", "rate-limit", "too many requests", "quota"]):
+            if any(
+                key in msg
+                for key in [
+                    "429",
+                    "rate limit",
+                    "rate-limit",
+                    "too many requests",
+                    "quota",
+                ]
+            ):
                 fail_rate_limit = True
 
         # Prefer exception type when available
         try:
             if not passed and getattr(call, "excinfo", None) is not None:
                 exc_type = call.excinfo.type
-                if _MaxTurnsExceeded is not None and issubclass(exc_type, _MaxTurnsExceeded):
+                if _MaxTurnsExceeded is not None and issubclass(
+                    exc_type, _MaxTurnsExceeded
+                ):
                     fail_timeout = True
-                if _RateLimitError is not None and issubclass(exc_type, _RateLimitError):
+                if _RateLimitError is not None and issubclass(
+                    exc_type, _RateLimitError
+                ):
                     fail_rate_limit = True
         except Exception:
             pass

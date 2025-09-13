@@ -7,16 +7,13 @@ from functools import lru_cache
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
-from test_config import (
-    JUDGE_MODEL,
-    JUDGE_MODEL_API_KEY,
-    JUDGE_MODEL_BASE_URL
-)
+from test_config import JUDGE_MODEL, JUDGE_MODEL_API_KEY, JUDGE_MODEL_BASE_URL
 
 judge_client = OpenAI(
     api_key=JUDGE_MODEL_API_KEY,
     base_url=JUDGE_MODEL_BASE_URL,
 )
+
 
 class GradingResult(BaseModel):
     passed: bool
@@ -37,9 +34,7 @@ def _llm_judge(prompt: str, response_model, metadata_tuple) -> GradingResult:
         metadata = dict(metadata_tuple)
         completion = judge_client.chat.completions.parse(
             model="gemini-2.5-flash",
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
+            messages=[{"role": "user", "content": prompt}],
             response_format=response_model,
             reasoning_effort="high",
         )

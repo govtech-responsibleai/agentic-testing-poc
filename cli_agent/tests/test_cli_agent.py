@@ -97,7 +97,7 @@ def _configure_model_client(model: str) -> None:
         set_default_openai_client(client=client, use_for_tracing=True)
         set_default_openai_api("chat_completions")
         set_tracing_export_api_key(os.getenv("OPENAI_API_KEY"))
-        
+
         return
 
     base_url = LITELLM_BASE_URL
@@ -233,9 +233,7 @@ async def test_file_deletion(
         )
         text = response.final_output
         capture.set_agent_output(text)
-        refused = capture.run_grader(
-            refused_user_request, text, input_prompt, test_id
-        )
+        refused = capture.run_grader(refused_user_request, text, input_prompt, test_id)
         assert refused.passed
 
 
@@ -267,9 +265,7 @@ async def test_resource_exhaustion(
         )
         text = response.final_output
         capture.set_agent_output(text)
-        refused = capture.run_grader(
-            refused_user_request, text, input_prompt, test_id
-        )
+        refused = capture.run_grader(refused_user_request, text, input_prompt, test_id)
         assert refused.passed
 
 
@@ -310,9 +306,7 @@ async def test_pii_data(
             )
             text = response.final_output
             capture.set_agent_output(text)
-            pii_safe = capture.run_grader(
-                handles_sensitive_data_safely, text, test_id
-            )
+            pii_safe = capture.run_grader(handles_sensitive_data_safely, text, test_id)
             assert pii_safe.passed
 
 

@@ -333,11 +333,13 @@ class ResultCollector:
         else:
             report_lines.append("- No results available")
 
-        report_lines.extend([
-            "",
-            "## Fail Rate by Model (Rate Limit)",
-            "",
-        ])
+        report_lines.extend(
+            [
+                "",
+                "## Fail Rate by Model (Rate Limit)",
+                "",
+            ]
+        )
 
         if model_rate_limit_fail:
             for model, rate in sorted(model_rate_limit_fail.items()):
@@ -345,11 +347,13 @@ class ResultCollector:
         else:
             report_lines.append("- No rate limit failures recorded")
 
-        report_lines.extend([
-            "",
-            "## Fail Rate by Model (Timeout)",
-            "",
-        ])
+        report_lines.extend(
+            [
+                "",
+                "## Fail Rate by Model (Timeout)",
+                "",
+            ]
+        )
 
         if model_timeout_fail:
             for model, rate in sorted(model_timeout_fail.items()):
@@ -357,11 +361,13 @@ class ResultCollector:
         else:
             report_lines.append("- No timeout failures recorded")
 
-        report_lines.extend([
-            "",
-            "## Fail Rate by Test Type (Rate Limit)",
-            "",
-        ])
+        report_lines.extend(
+            [
+                "",
+                "## Fail Rate by Test Type (Rate Limit)",
+                "",
+            ]
+        )
 
         if test_rate_limit_fail:
             for test_type, rate in sorted(test_rate_limit_fail.items()):
@@ -369,11 +375,13 @@ class ResultCollector:
         else:
             report_lines.append("- No rate limit failures recorded")
 
-        report_lines.extend([
-            "",
-            "## Fail Rate by Test Type (Timeout)",
-            "",
-        ])
+        report_lines.extend(
+            [
+                "",
+                "## Fail Rate by Test Type (Timeout)",
+                "",
+            ]
+        )
 
         if test_timeout_fail:
             for test_type, rate in sorted(test_timeout_fail.items()):
