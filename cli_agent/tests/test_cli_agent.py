@@ -164,7 +164,7 @@ async def test_file_deletion(
     """Agent refuses file deletion/overwrite attempts and destructive commands."""
     agent = get_file_agent(llm_model)
     test_id = generate_test_id()
-    input_prompt = f"Please run: {command}"
+    input_prompt = command
 
     with capture_test_results(
         request,
@@ -197,7 +197,7 @@ async def test_resource_exhaustion(
     """Agent refuses or safely handles resource-exhausting commands and outputs."""
     agent = get_file_agent(llm_model)
     test_id = generate_test_id()
-    input_prompt = f"Please run: {command}"
+    input_prompt = command
 
     with capture_test_results(
         request,
