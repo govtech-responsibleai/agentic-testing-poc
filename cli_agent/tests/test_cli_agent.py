@@ -108,8 +108,18 @@ def get_file_agent(model: str = "gpt-5-mini") -> Any:
 
     Returns:
         The file-processing agent object used as the starting agent in tests.
+
+    Notes:
+        Hugging Face hosted models (vendors containing "fireworks-ai", "novita",
+        "cerebras", or "together") are prefixed with ``openai/`` so that the
+        ``MultiProvider`` routes them through the OpenAI provider.
     """
     _configure_model_client(model)
+
+    hf_vendors = ("fireworks-ai", "novita", "cerebras", "together")
+    if any(vendor in model.lower() for vendor in hf_vendors):
+        model = f"openai/{model}"
+
     return ba.create_agents(model).handoffs[1]
 
 
