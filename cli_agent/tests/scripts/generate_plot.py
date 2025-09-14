@@ -1,15 +1,22 @@
-# Rebuild chart with requested updates:
-# - Darker color palette (reverted).
-# - Proper-cased titles with underscores removed.
-# - Facet order: File Deletion, Resource Exhaustion, PII Data, Prompt Injection.
-# - Keep labels "XX% (yy)" and hide right-column y tick labels.
-# - Save to /mnt/data/faceted_stacked_outcomes_dark.png
+"""Generate a faceted stacked outcomes plot from CSV results.
 
-from typing import List, Dict
+Rebuild chart with requested updates:
+- Darker color palette (reverted).
+- Proper-cased titles with underscores removed.
+- Facet order: File Deletion, Resource Exhaustion, PII Data, Prompt Injection.
+- Keep labels "XX% (yy)" and hide right-column y tick labels.
+"""
+
+import argparse
+import logging
+import sys
+from pathlib import Path
+from typing import Dict, List, Optional
+
+from matplotlib.patches import Patch
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
 
 FILE_PATH: str = "../test_reports/compiled_results.csv"
 SAVE_PATH: str = "../summary_plot.png"
@@ -136,7 +143,7 @@ def build_faceted_chart(csv_path: str, save_path: str) -> None:
     title_map: Dict[str, str] = {
         "file_deletion": "File Deletion",
         "resource_exhaustion": "Resource Exhaustion",
-        "pii_data": "PII Data",
+        "pii_data": "PII Leakage",
         "prompt_injection": "Prompt Injection",
     }
 
@@ -228,8 +235,92 @@ def build_faceted_chart(csv_path: str, save_path: str) -> None:
     # Save and show
     plt.savefig(save_path, dpi=200, bbox_inches="tight")
     plt.show()
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for input/output paths.
+
+    Returns:
+        Parsed namespace with `input`, `output`, and `verbose`.
+    """
+    parser = argparse.ArgumentParser(
+        description="Generate a faceted stacked outcomes plot from a CSV file."
+    )
+    parser.add_argument(
+        "-i",
+        "--input",
+        type=Path,
+        default=None,
+        help=(
+            "Path to input CSV data (e.g., test_results_combined.csv). "
+            "If omitted, you will be prompted."
+        ),
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        default=Path(SAVE_PATH),
+        help="Path to save the output PNG image.",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable verbose logging.",
+    )
+    return parser.parse_args()
 
 
-build_faceted_chart(FILE_PATH, SAVE_PATH)
+def configure_logging(verbose: bool) -> None:
+    """Configure logging format and level.
 
-print(f"Saved figure to: {SAVE_PATH}")
+    Args:
+        verbose: True for DEBUG, False for INFO.
+    """
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
+
+
+def main() -> int:
+    """CLI entry point allowing the user to provide input/output paths.
+
+    Returns:
+        Process exit code (0 for success, 1 for failure).
+    """
+    args = parse_args()
+    configure_logging(args.verbose)
+
+    # Determine input path, prompting interactively if not provided.
+    input_path: Optional[Path] = args.input
+    if input_path is None:
+        default_path = Path(FILE_PATH)
+        if sys.stdin.isatty():
+            try:
+                prompt = f"Enter path to input CSV [{default_path}]: "
+                user_val = input(prompt).strip()
+            except (EOFError, KeyboardInterrupt):  # pragma: no cover - interactive only
+                user_val = ""
+            input_path = (
+                default_path if user_val == "" else Path(user_val).expanduser()
+            )
+        else:
+            logging.info(
+                "No --input provided and not in TTY; using default: %s", default_path
+            )
+            input_path = default_path
+    output_path: Path = args.output
+
+    if not input_path.exists():
+        logging.error("Input CSV not found: %s", input_path)
+        return 1
+
+    try:
+        build_faceted_chart(str(input_path), str(output_path))
+        logging.info("Saved figure to: %s", output_path)
+        return 0
+    except Exception as exc:  # noqa: BLE001
+        logging.exception("Failed to generate plot: %s", exc)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
