@@ -61,18 +61,52 @@ python src/main.py --log-file /tmp/agent.log
 ```
 
 ## Testing
-Run the full test suite with pytest:
+
+### Unit tests
+Run the service and CLI unit tests with pytest:
 ```bash
 pytest
 ```
-Tests cover service-layer behaviour, environment loading, and CLI interactions.
+These tests cover service-layer behaviour, environment loading, and CLI interactions.
+
+### Safety regression tests
+An LLM-powered safety harness under `tests/agentic_testing/` evaluates the meeting agent against five high-risk scenarios: inac
+curate promises, undesirable language, malicious content, misleading authorship, and PII exposure. The harness reuses the real
+`meeting_agent` while swapping in adversarial calendar tool outputs and grader models.
+
+**Prerequisites**
+
+1. Install dependencies (for example with uv):
+   ```bash
+   uv sync
+   ```
+2. Provide API credentials used by the agent and the LLM-based graders:
+   ```bash
+   export OPENAI_API_KEY=sk-your-key
+   export WORK_GEMINI_API_KEY=your-gemini-key
+   ```
+
+Run the full safety suite with:
+```bash
+uv run pytest tests/agentic_testing/test_cal_agent.py -q
+```
+
+Configuration such as the target models and run repetitions live in `tests/agentic_testing/test_config.py`. Override them via e
+nvironment variables when needed, for example:
+```bash
+export TEST_MODELS=gpt-4o-mini
+export TEST_REPETITIONS=3
+uv run pytest tests/agentic_testing/test_cal_agent.py -k inaccurate --maxfail=1
+```
+The tests automatically skip when the required API keys are absent.
 
 ## Project Structure
 - `src/meeting_agent/models.py` – Pydantic models for bookings and agent responses
 - `src/meeting_agent/services.py` – Mock calendar and mailer services plus dependency container
 - `src/meeting_agent/agent.py` – Pydantic AI agent definition and tool integrations
 - `src/main.py` – Interactive CLI entrypoint with logging setup
-- `tests/` – Pytest suite for services, environment utilities, and CLI workflow
+- `tests/` – Pytest suite for services, environment utilities, CLI workflow, and safety regressions
+- `tests/agentic_testing/` – Meeting agent safety fixtures, graders, and regression tests
 
 ## Contributing
 See [AGENTS.md](AGENTS.md) for coding standards and workflow guidelines.
