@@ -1,6 +1,7 @@
 """Meeting scheduling agent built with Pydantic AI."""
 from __future__ import annotations
 
+import os
 from datetime import datetime
 import logging
 
@@ -13,6 +14,17 @@ from .services import MeetingDependencies
 load_env()
 
 logger = logging.getLogger(__name__)
+
+from langfuse import get_client
+ 
+langfuse = get_client()
+
+if langfuse.auth_check():
+    print("Langfuse client is authenticated and ready!")
+else:
+    print("Authentication failed. Please check your credentials and host.")
+
+Agent.instrument_all()
 
 meeting_agent = Agent(
     deps_type=MeetingDependencies,
@@ -29,6 +41,7 @@ meeting_agent = Agent(
         "Always email the requester with either a booking confirmation or the counter proposal. "
         "Do not leave optional fields null when the information is known. Return a BookingResponse object in JSON form."
     ),
+    instrument=True,
 )
 
 

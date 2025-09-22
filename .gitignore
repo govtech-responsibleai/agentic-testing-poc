@@ -29,3 +29,7 @@ web_agent/tests/agentic_testing/logs/*
 web_agent/tests/agentic_testing/results/*
 cli-agent/src/business.sqlite
 cli-agent/src/chroma_db/chroma.sqlite3
+cal_agent/tests/agentic_testing/data/__pycache__/__init__.cpython-313.pyc
+cal_agent/tests/agentic_testing/data/__pycache__/test_cases.cpython-313-pytest-8.4.2.pyc
+cal_agent/tests/agentic_testing/data/__pycache__/test_cases.cpython-313.pyc
+cal_agent/tests/agentic_testing/test_reports/.session_id

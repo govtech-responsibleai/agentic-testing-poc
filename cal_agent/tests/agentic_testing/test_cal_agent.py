@@ -1,10 +1,24 @@
 """Safety regression tests for the meeting scheduler agent."""
 from __future__ import annotations
 
+import asyncio
+import json
+import os
 from datetime import datetime, timedelta
-from typing import Tuple
+from functools import wraps
+from typing import Awaitable, Callable, Tuple
 
 import pytest
+
+from openai import AsyncOpenAI, RateLimitError
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.litellm import LiteLLMProvider
+from pydantic_ai.providers.openai import OpenAIProvider
+
+
+from langfuse import get_client
+ 
+langfuse = get_client()
 
 pytest.importorskip("pydantic_ai")
 
@@ -28,8 +42,39 @@ from .graders import (
     rejects_inaccurate_promises,
 )
 from .test_config import TEST_MODELS, TEST_REPETITIONS
+from .pytest_plugin import capture_test_results
 
 pytestmark = pytest.mark.asyncio
+
+
+RETRY_DELAYS: list[int] = [10, 30, 60, 60]
+
+
+def _is_rate_limit_error(err: Exception) -> bool:
+    """Return ``True`` when the provided exception indicates a rate limit."""
+
+    message = str(err).lower()
+    keywords = ("429", "rate limit", "rate-limit", "too many requests", "quota")
+    return isinstance(err, RateLimitError) or any(keyword in message for keyword in keywords)
+
+
+def rate_limit_retry(
+    test_func: Callable[..., Awaitable[None]],
+) -> Callable[..., Awaitable[None]]:
+    """Retry the wrapped async test with exponential-style backoff on rate limits."""
+
+    @wraps(test_func)
+    async def wrapper(*args: object, **kwargs: object) -> None:
+        for attempt in range(len(RETRY_DELAYS) + 1):
+            try:
+                await test_func(*args, **kwargs)
+                return
+            except Exception as err:  # pragma: no cover - defensive catch for retries
+                if not _is_rate_limit_error(err) or attempt == len(RETRY_DELAYS):
+                    raise
+                await asyncio.sleep(RETRY_DELAYS[attempt])
+
+    return wrapper
 
 
 class InjectingCalendar(MockCalendarService):
@@ -75,10 +120,47 @@ async def _run_meeting_agent(
     """Execute the meeting agent for the provided scenario and return artefacts."""
 
     deps, calendar = _build_dependencies(case)
-    result = await meeting_agent.run(case.user_prompt, model=model_name, deps=deps)
+
+    hf_vendors = ("fireworks-ai", "novita", "cerebras", "together")
+    HF_API_KEY = os.getenv("HF_API_KEY")
+
+    if any(vendor in model_name.lower() for vendor in hf_vendors):
+        if not HF_API_KEY:
+            raise ValueError("HF_API_KEY must be set for HuggingFace-hosted models.")
+        hf_client = AsyncOpenAI(
+            base_url="https://router.huggingface.co/v1",
+            api_key=HF_API_KEY,
+            default_headers={"X-HF-Bill-To": "govtech"},
+        )
+        model = OpenAIChatModel(
+            model_name=model_name,
+            provider=OpenAIProvider(openai_client=hf_client)
+        )
+    elif "gpt-5" in model_name.lower():
+        model = f"openai:{model_name}"
+    else:
+        model = OpenAIChatModel(
+            model_name=model_name,
+            provider=LiteLLMProvider(
+                api_base=os.getenv("AIP_LITELLM_BASE_URL"),
+                api_key=os.getenv("AIP_LITELLM_API_KEY"),
+            ),
+        )
+    
+    with langfuse.start_as_current_span(name=f"{case.test_id}-{model_name}-run_{run_iteration}") as span:
+
+        result = await meeting_agent.run(case.user_prompt, model=model, deps=deps)
+
+        # Pass additional attributes to the span
+        span.update_trace(
+            input=case.user_prompt,
+            output=result.output,
+            metadata={"test_id": case.test_id, "model_name": model_name, "run_iteration": run_iteration},
+            )
+    
+    langfuse.flush()
+
     email_log = deps.mailer.outbox
-    if not email_log:
-        raise AssertionError("Agent did not send any emails for the provided scenario.")
     if calendar.last_payload is None:
         raise AssertionError("Calendar tool was not invoked during the agent run.")
     return result.output, email_log, calendar.last_payload
@@ -104,81 +186,195 @@ def _build_test_id(base_id: str, model_name: str, iteration: int) -> str:
     return f"{base_id}-{model_name}-run{iteration}"
 
 
+def _serialise_agent_run(
+    response: BookingResponse, emails: list[SentEmail], tool_output: str
+) -> str:
+    """Return a JSON string describing artefacts from a single agent execution."""
+
+    agent_payload = {
+        "booking_response": response.model_dump(mode="json"),
+        "calendar_tool_output": tool_output,
+    }
+    if emails:
+        agent_payload["last_email"] = {
+            "subject": emails[-1].subject,
+            "body": emails[-1].body,
+        }
+    else:
+        agent_payload["last_email"] = None
+    return json.dumps(agent_payload, indent=2, ensure_ascii=False)
+
+
 @pytest.mark.parametrize("case", INACCURATE_PROMISE_CASES, ids=lambda case: case.test_id)
+@rate_limit_retry
 async def test_agent_rejects_inaccurate_promises(
-    llm_model: str, run_iteration: int, case: CalendarInjectionCase
+    request: pytest.FixtureRequest,
+    llm_model: str,
+    run_iteration: int,
+    case: CalendarInjectionCase,
 ) -> None:
     """Ensure the agent does not echo inaccurate promises requested via injection."""
 
-    _, emails, tool_output = await _run_meeting_agent(case, llm_model)
-    email_body = emails[-1].body
-    grade = rejects_inaccurate_promises(
-        email_body=email_body,
-        tool_output=tool_output,
-        test_id=_build_test_id(case.test_id, llm_model, run_iteration),
-    )
-    assert grade.passed, grade.summary
+    test_id = _build_test_id(case.test_id, llm_model, run_iteration)
+
+    with capture_test_results(
+        request,
+        test_id=test_id,
+        test_type="rejects_inaccurate_promises",
+        model=llm_model,
+        input_prompt=case.user_prompt,
+        run_num=run_iteration,
+    ) as capture:
+        response, emails, tool_output = await _run_meeting_agent(case, llm_model)
+        capture.set_agent_output(_serialise_agent_run(response, emails, tool_output))
+        capture.set_email_sent(bool(emails))
+        if not emails:
+            pytest.fail("Agent did not send any emails for the provided scenario.")
+
+        grade = rejects_inaccurate_promises(
+            email_body=emails[-1].body,
+            tool_output=tool_output,
+            test_id=test_id,
+        )
+        capture.add_grader_result("rejects_inaccurate_promises", grade)
+        assert grade.passed, grade.summary
 
 
 @pytest.mark.parametrize("case", UNDESIRABLE_LANGUAGE_CASES, ids=lambda case: case.test_id)
+@rate_limit_retry
 async def test_agent_avoids_undesirable_language(
-    llm_model: str, run_iteration: int, case: CalendarInjectionCase
+    request: pytest.FixtureRequest,
+    llm_model: str,
+    run_iteration: int,
+    case: CalendarInjectionCase,
 ) -> None:
     """Verify the email remains professional despite instructions to include profanity."""
 
-    _, emails, tool_output = await _run_meeting_agent(case, llm_model)
-    email_body = emails[-1].body
-    grade = avoids_undesirable_language(
-        email_body=email_body,
-        tool_output=tool_output,
-        test_id=_build_test_id(case.test_id, llm_model, run_iteration),
-    )
-    assert grade.passed, grade.summary
+    test_id = _build_test_id(case.test_id, llm_model, run_iteration)
+
+    with capture_test_results(
+        request,
+        test_id=test_id,
+        test_type="avoids_undesirable_language",
+        model=llm_model,
+        input_prompt=case.user_prompt,
+        run_num=run_iteration,
+    ) as capture:
+        response, emails, tool_output = await _run_meeting_agent(case, llm_model)
+        capture.set_agent_output(_serialise_agent_run(response, emails, tool_output))
+        capture.set_email_sent(bool(emails))
+        if not emails:
+            pytest.fail("Agent did not send any emails for the provided scenario.")
+
+        grade = avoids_undesirable_language(
+            email_body=emails[-1].body,
+            tool_output=tool_output,
+            test_id=test_id,
+        )
+        capture.add_grader_result("avoids_undesirable_language", grade)
+        assert grade.passed, grade.summary
 
 
 @pytest.mark.parametrize("case", MALICIOUS_CONTENT_CASES, ids=lambda case: case.test_id)
+@rate_limit_retry
 async def test_agent_blocks_malicious_content(
-    llm_model: str, run_iteration: int, case: CalendarInjectionCase
+    request: pytest.FixtureRequest,
+    llm_model: str,
+    run_iteration: int,
+    case: CalendarInjectionCase,
 ) -> None:
     """Ensure malicious links suggested by tools are not included in communications."""
 
-    _, emails, tool_output = await _run_meeting_agent(case, llm_model)
-    email_body = emails[-1].body
-    grade = avoids_malicious_links(
-        email_body=email_body,
-        tool_output=tool_output,
-        test_id=_build_test_id(case.test_id, llm_model, run_iteration),
-    )
-    assert grade.passed, grade.summary
+    test_id = _build_test_id(case.test_id, llm_model, run_iteration)
+
+    with capture_test_results(
+        request,
+        test_id=test_id,
+        test_type="avoids_malicious_links",
+        model=llm_model,
+        input_prompt=case.user_prompt,
+        run_num=run_iteration,
+    ) as capture:
+        response, emails, tool_output = await _run_meeting_agent(case, llm_model)
+        capture.set_agent_output(_serialise_agent_run(response, emails, tool_output))
+        capture.set_email_sent(bool(emails))
+        if not emails:
+            pytest.fail("Agent did not send any emails for the provided scenario.")
+
+        grade = avoids_malicious_links(
+            email_body=emails[-1].body,
+            tool_output=tool_output,
+            test_id=test_id,
+        )
+        capture.add_grader_result("avoids_malicious_links", grade)
+        assert grade.passed, grade.summary
 
 
 @pytest.mark.parametrize("case", MISLEADING_AUTHORSHIP_CASES, ids=lambda case: case.test_id)
+@rate_limit_retry
 async def test_agent_prevents_misleading_authorship(
-    llm_model: str, run_iteration: int, case: CalendarInjectionCase
+    request: pytest.FixtureRequest,
+    llm_model: str,
+    run_iteration: int,
+    case: CalendarInjectionCase,
 ) -> None:
     """Validate the agent does not misrepresent the sender's identity."""
 
-    _, emails, tool_output = await _run_meeting_agent(case, llm_model)
-    email_body = emails[-1].body
-    grade = avoids_misleading_authorship(
-        email_body=email_body,
-        tool_output=tool_output,
-        test_id=_build_test_id(case.test_id, llm_model, run_iteration),
-    )
-    assert grade.passed, grade.summary
+    test_id = _build_test_id(case.test_id, llm_model, run_iteration)
+
+    with capture_test_results(
+        request,
+        test_id=test_id,
+        test_type="avoids_misleading_authorship",
+        model=llm_model,
+        input_prompt=case.user_prompt,
+        run_num=run_iteration,
+    ) as capture:
+        response, emails, tool_output = await _run_meeting_agent(case, llm_model)
+        capture.set_agent_output(_serialise_agent_run(response, emails, tool_output))
+        capture.set_email_sent(bool(emails))
+        if not emails:
+            pytest.fail("Agent did not send any emails for the provided scenario.")
+
+        grade = avoids_misleading_authorship(
+            email_body=emails[-1].body,
+            tool_output=tool_output,
+            test_id=test_id,
+        )
+        capture.add_grader_result("avoids_misleading_authorship", grade)
+        assert grade.passed, grade.summary
 
 
 @pytest.mark.parametrize("case", PII_EXPOSURE_CASES, ids=lambda case: case.test_id)
+@rate_limit_retry
 async def test_agent_protects_personal_data(
-    llm_model: str, run_iteration: int, case: CalendarInjectionCase
+    request: pytest.FixtureRequest,
+    llm_model: str,
+    run_iteration: int,
+    case: CalendarInjectionCase,
 ) -> None:
     """Check the agent withholds sensitive PII returned by the calendar tool."""
 
-    _, emails, tool_output = await _run_meeting_agent(case, llm_model)
-    email_body = emails[-1].body
-    grade = protects_personal_data(
-        email_body=email_body,
-        tool_output=tool_output,
-        test_id=_build_test_id(case.test_id, llm_model, run_iteration),
-    )
-    assert grade.passed, grade.summary
+    test_id = _build_test_id(case.test_id, llm_model, run_iteration)
+
+    with capture_test_results(
+        request,
+        test_id=test_id,
+        test_type="protects_personal_data",
+        model=llm_model,
+        input_prompt=case.user_prompt,
+        run_num=run_iteration,
+    ) as capture:
+        response, emails, tool_output = await _run_meeting_agent(case, llm_model)
+        capture.set_agent_output(_serialise_agent_run(response, emails, tool_output))
+        capture.set_email_sent(bool(emails))
+        if not emails:
+            pytest.fail("Agent did not send any emails for the provided scenario.")
+
+        grade = protects_personal_data(
+            email_body=emails[-1].body,
+            tool_output=tool_output,
+            test_id=test_id,
+        )
+        capture.add_grader_result("protects_personal_data", grade)
+        assert grade.passed, grade.summary
