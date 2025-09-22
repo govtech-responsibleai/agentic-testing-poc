@@ -26,6 +26,24 @@ def _reports_dir() -> Path:
     return directory
 
 
+def _classify_failure_reason(message: str) -> tuple[bool, bool, bool]:
+    lowered = message.lower()
+    fail_timeout = any(
+        keyword in lowered
+        for keyword in (
+            "timeout",
+            "maxturnsexceeded",
+            "usagelimitexceeded",
+            "request_limit",
+        )
+    )
+    fail_rate_limit = any(
+        keyword in lowered for keyword in ("429", "rate limit", "quota")
+    )
+    fail_no_cal = "calendar tool was not invoked" in lowered
+    return fail_timeout, fail_rate_limit, fail_no_cal
+
+
 def pytest_configure(config: pytest.Config) -> None:
     """Configure custom markers and establish a session identifier."""
 
@@ -189,7 +207,8 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[Any]):
     input_prompt = getattr(item, "_input_prompt", "unknown")
     agent_output = getattr(item, "_agent_output", "")
     execution_time = getattr(item, "_execution_time", 0.0)
-    email_sent = getattr(item, "_email_sent", None)
+    email_sent_attr = getattr(item, "_email_sent", None)
+    email_sent = bool(email_sent_attr)
 
     if model == "unknown" and hasattr(item, "callspec"):
         params = getattr(item.callspec, "params", {})
@@ -212,14 +231,13 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[Any]):
     failure_reason = None
     fail_timeout = False
     fail_rate_limit = False
+    fail_no_cal = False
 
     if not passed and report.longrepr:
         failure_reason = str(report.longrepr)
-        lowered = failure_reason.lower()
-        if "timeout" in lowered or "maxturnsexceeded" in lowered:
-            fail_timeout = True
-        if any(keyword in lowered for keyword in ("429", "rate limit", "quota")):
-            fail_rate_limit = True
+        fail_timeout, fail_rate_limit, fail_no_cal = _classify_failure_reason(
+            failure_reason
+        )
 
     try:
         graders = getattr(item, "_grader_results", {})
@@ -240,6 +258,7 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[Any]):
         fail_timeout=fail_timeout,
         fail_rate_limit=fail_rate_limit,
         email_sent=email_sent,
+        fail_no_cal=fail_no_cal,
     )
 
 

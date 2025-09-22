@@ -29,7 +29,7 @@ class TestResult:
     input_prompt: str
     agent_output: str
     passed: bool
-    email_sent: Optional[bool] = None
+    email_sent: bool = False
     run_num: int = 1
     failure_reason: Optional[str] = None
     grader_results: Optional[Dict[str, Any]] = None
@@ -37,6 +37,7 @@ class TestResult:
     timestamp: Optional[str] = None
     fail_timeout: bool = False
     fail_rate_limit: bool = False
+    fail_no_cal: bool = False
 
 
 class ResultCollector:
@@ -101,7 +102,8 @@ class ResultCollector:
                         result_data.setdefault("run_num", 1)
                         result_data.setdefault("fail_timeout", False)
                         result_data.setdefault("fail_rate_limit", False)
-                        result_data.setdefault("email_sent", None)
+                        result_data.setdefault("fail_no_cal", False)
+                        result_data.setdefault("email_sent", False)
                         all_results.append(TestResult(**result_data))
             except Exception as error:
                 print(f"Warning: Could not load {worker_file}: {error}")
@@ -137,6 +139,7 @@ class ResultCollector:
                 "email_sent",
                 "fail_timeout",
                 "fail_rate_limit",
+                "fail_no_cal",
                 "failure_reason",
                 "grader_results",
                 "execution_time",
@@ -267,9 +270,7 @@ class ResultCollector:
                     ]
                 )
 
-        missing_email_tests = [
-            result for result in self.results if result.email_sent is False
-        ]
+        missing_email_tests = [result for result in self.results if not result.email_sent]
         if missing_email_tests:
             lines.extend(["", "## Missing Email Runs", ""])
             for result in missing_email_tests:
@@ -350,7 +351,8 @@ def add_test_result(
     execution_time: Optional[float] = None,
     fail_timeout: bool = False,
     fail_rate_limit: bool = False,
-    email_sent: Optional[bool] = None,
+    email_sent: bool = False,
+    fail_no_cal: bool = False,
 ) -> None:
     """Convenience wrapper for storing a result entry."""
 
@@ -370,6 +372,7 @@ def add_test_result(
             execution_time=execution_time,
             fail_timeout=fail_timeout,
             fail_rate_limit=fail_rate_limit,
+            fail_no_cal=fail_no_cal,
         )
     )
 
