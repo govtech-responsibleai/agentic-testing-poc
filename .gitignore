@@ -1,35 +1,87 @@
 # Python-generated files
 __pycache__/
-*.py[oc]
+*.py[cod]
+*$py.class
+*.so
 build/
 dist/
 wheels/
 *.egg-info
+*.egg
 
 # Virtual environments
-.venv
+.venv/
+venv/
+ENV/
+env/
 .env
-.gradio
+.env.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.log
+
+# Secrets and credentials
 *.secrets.yaml
+.gradio
 
-
+# Data directories (except test data)
 data/
-!cal_agent/tests/agentic_testing/data/
-!cal_agent/tests/agentic_testing/data/**
+!*/tests/*/data/
+!*/tests/agentic_testing/data/
 
+# Log directories
 *logs/*
 *.log
 eval_log/
 
-eval/output
+# Test reports and results
+*/test_reports/*.csv
+*/test_reports/*.json
+*/test_reports/*.md
+*/test_reports/.session_id
+!*/test_reports/.gitkeep
+*/tests/agentic_testing/logs/*
+*/tests/agentic_testing/results/*
+!*/tests/agentic_testing/logs/.gitkeep
+!*/tests/agentic_testing/results/.gitkeep
 
-.DS_Store
+# Generated outputs
+eval/output/
+output_reports/
 
-web_agent/tests/agentic_testing/logs/*
-web_agent/tests/agentic_testing/results/*
-cli-agent/src/business.sqlite
-cli-agent/src/chroma_db/chroma.sqlite3
-cal_agent/tests/agentic_testing/data/__pycache__/__init__.cpython-313.pyc
-cal_agent/tests/agentic_testing/data/__pycache__/test_cases.cpython-313-pytest-8.4.2.pyc
-cal_agent/tests/agentic_testing/data/__pycache__/test_cases.cpython-313.pyc
-cal_agent/tests/agentic_testing/test_reports/.session_id
+# Database files
+*.sqlite
+*.sqlite3
+*.db
+
+# Vector database
+chroma_db/
+src/chroma_db/
+
+# Generated images and plots
+*.png
+!docs/*.png
+!documentation/*.png
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Package lock files (keep these for reproducibility)
+# uv.lock is kept
+# pyproject.toml is kept
+
+# OS-specific
+Thumbs.db

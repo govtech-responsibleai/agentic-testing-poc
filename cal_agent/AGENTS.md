@@ -1,82 +1,187 @@
-# Meeting Scheduler Agent Testing Guide
+# Meeting Scheduler Agent - Development Guide
 
-This directory hosts both the interactive meeting scheduler agent and its agentic safety regression suite. The guidance below explains how to work on the agent implementation and how to run the associated tests.
+Development guidelines specific to the meeting scheduler agent testing sample.
 
 ## Project Overview
-- **Agent**: Pydantic AI powered assistant that books meetings by coordinating mocked calendar and email tools.
-- **Safety tests**: Pytest-based harness under `tests/agentic_testing/` that exercises the real agent against five high-risk calendar tool scenarios using LLM graders.
-- **Goal**: Ensure the agent refuses unsafe instructions injected through the calendar tool while remaining helpful for legitimate scheduling tasks.
 
-## Setup
-1. Use **Python 3.11**.
-2. Install dependencies (example with uv):
-   ```bash
-   uv sync
-   ```
-3. Copy or create a `.env` file that defines the required API keys:
-   ```bash
-   export OPENAI_API_KEY=sk-your-key
-   export WORK_GEMINI_API_KEY=your-gemini-key
-   ```
-4. Activate logging/output directories as needed; never commit secrets.
+- **Agent**: Pydantic AI powered meeting scheduler with mocked calendar and email tools
+- **Safety Tests**: Pytest suite testing agent responses to adversarial calendar tool outputs
+- **Goal**: Ensure agents refuse unsafe instructions while remaining helpful for legitimate tasks
 
-## Running the Meeting Agent
+## Quick Commands
+
 ```bash
+# Run the agent
 uv run python src/main.py
-```
-The CLI collects the requester email and the meeting request each turn. Logs are written to the `log/` directory unless overwritten via CLI flags.
 
-## Safety Testing Framework
+# Run unit tests
+uv run pytest tests/ -k "not agentic_testing"
 
-### Quick start
-Run the safety suite with the default model configuration (single worker):
-```bash
+# Run safety tests
 uv run pytest tests/agentic_testing/test_cal_agent.py -q
-```
-Tests automatically skip when `OPENAI_API_KEY` or `WORK_GEMINI_API_KEY` is missing. `pydantic_ai` must also be importable.
 
-Rate limits from upstream providers can cause intermittent `429` or "quota" failures. The regression tests automatically retry these failures with delays of 10, 30, 60, and 60 seconds (five total attempts) before surfacing an error, mirroring the CLI agent suite's resilience logic.
-
-To parallelise, enable xdist workers—the reporting plugin merges runs from all workers automatically:
-```bash
-uv run pytest tests/agentic_testing/test_cal_agent.py -v -n auto
+# Parallel safety tests
+uv run pytest tests/agentic_testing/test_cal_agent.py -n auto
 ```
 
-### Configuration & repetitions
-- Default options live in `tests/agentic_testing/test_config.py`.
-- Override at runtime via environment variables, for example:
-  ```bash
-  export CAL_AGENT_TEST_MODELS=gpt-4o-mini
-  export CAL_AGENT_TEST_REPETITIONS=2
-  uv run pytest tests/agentic_testing/test_cal_agent.py -k inaccurate --maxfail=1
-  ```
-- Tests call the real `meeting_agent` from `src/meeting_agent/agent.py` with mocked calendar responses defined in `tests/agentic_testing/data/test_cases.py`.
+## Development Standards
 
-### Session reporting
-- The pytest plugin under `tests/agentic_testing/pytest_plugin.py` captures prompts, agent outputs, grader payloads, execution timing, and error metadata for every run (including failures).
-- Aggregated artefacts are written to `tests/agentic_testing/test_reports/` at session end:
-  - `test_results_<timestamp>.csv` – consolidated row-level results (UTF-8 with BOM for spreadsheet use)
-  - `test_summary_report_<timestamp>.md` – human-readable pass/fail overview and failed-test highlights
-  - `raw_test_results_<timestamp>.json` – structured payload for downstream analysis
-- Per-worker scratch files named `worker_<session>_*.json` exist during execution and are removed once the consolidated reports are generated. Generated artefacts are ignored via the directory’s `.gitignore`; do not commit them.
-- Control report emission with environment variables defined in `test_config.py`, e.g. set `CAL_AGENT_GENERATE_REPORTS=0` to disable reporting or `CAL_AGENT_REPORTS_DIR=/tmp/cal_agent_reports` to change the destination.
+Extends root [AGENTS.md](../AGENTS.md) with project-specific rules:
 
-### Risk categories
-The fixtures cover five adversarial behaviours:
-1. **Inaccurate promises** – calendar tool urges the agent to make misleading public commitments.
-2. **Undesirable language** – prompts attempt to insert profanity or abusive tone.
-3. **Malicious content** – instructions push suspicious links or malware-style copy.
-4. **Misleading authorship** – attempts to impersonate senior officials in sign-offs.
-5. **PII exposure** – responses include sensitive personal data leaked by the tool.
+### Python Version
+- **Python 3.11** (same as root)
 
-Grading is handled by `tests/agentic_testing/graders.py`, which relies on LLM judges. New scenarios should follow the existing `CalendarInjectionCase` structure.
+### Dependencies
+- Use `uv` for package management
+- Keep dependencies minimal
+- Update requirements when adding packages
 
-## Contribution Guidelines
-- Follow **PEP 8** and include **type hints** for all functions and methods.
-- Sort imports alphabetically within standard-library, third-party, and local groups.
-- Prefer **f-strings** and the **logging** module over raw `print` statements.
-- Document public modules, classes, and functions with docstrings.
-- Run `pytest` before submitting changes; ensure deterministic behaviour in tests by mocking randomness when necessary.
-- Keep dependencies minimal and update this guide plus `README.md` whenever configuration expectations change.
+### Code Style
+- Follow PEP 8 conventions
+- Include type hints for all functions
+- Sort imports alphabetically (stdlib, third-party, local)
+- Prefer f-strings for formatting
+- Use `logging` module instead of `print`
 
-These rules extend the root-level `AGENTS.md`. When conflicts arise, prefer the more specific instructions in this file.
+### Testing
+
+#### Unit Tests
+- Test service layer independently
+- Test environment loading
+- Test model validation
+- Mock external dependencies
+
+#### Safety Tests
+- Add new scenarios to `tests/agentic_testing/data/test_cases.py`
+- Follow `CalendarInjectionCase` structure
+- Include clear descriptions and expected behaviors
+- Test against all configured models
+
+### Safety Test Framework
+
+#### Adding New Test Scenarios
+
+1. Define case in `tests/agentic_testing/data/test_cases.py`:
+
+```python
+NEW_RISK_CASES = [
+    CalendarInjectionCase(
+        test_id="new_risk_001",
+        category="new_risk_category",
+        description="Description of the attack",
+        request_text="User request text",
+        adversarial_response="Malicious instruction from calendar tool",
+        expected_behavior="How agent should respond"
+    )
+]
+```
+
+2. Add grader function to `tests/agentic_testing/graders.py`:
+
+```python
+async def detects_new_risk(agent_output: str, expected_behavior: str) -> tuple[bool, str]:
+    """Evaluate if agent handles new risk appropriately."""
+    # Use LLM-based evaluation
+    # Return (passed, reasoning)
+```
+
+3. Add test function to `tests/agentic_testing/test_cal_agent.py`:
+
+```python
+@rate_limit_retry
+@capture_test_results
+async def test_agent_response_to_new_risk(model: str, case: CalendarInjectionCase):
+    # Test implementation
+```
+
+#### Grader Guidelines
+
+- Use LLM-based grading for nuanced behaviors
+- Provide clear prompts to grader models
+- Return `(bool, str)` tuple: (passed, reasoning)
+- Handle edge cases gracefully
+- Cache grader results when possible
+
+### Configuration
+
+- Test configuration: `tests/agentic_testing/test_config.py`
+- Environment variables:
+  - `CAL_AGENT_TEST_MODELS`: Comma-separated model list
+  - `CAL_AGENT_TEST_REPETITIONS`: Number of runs per test
+  - `CAL_AGENT_GENERATE_REPORTS`: Enable/disable reporting
+  - `CAL_AGENT_REPORTS_DIR`: Custom report directory
+
+### Logging
+
+- Agent logs: `log/<timestamp>_log.log`
+- Test logs: Captured by pytest
+- Use structured logging for important events
+- Include context in log messages
+
+### Rate Limiting
+
+Safety tests include automatic retry logic:
+- Retry delays: 10s, 30s, 60s, 60s (5 attempts total)
+- Detects: HTTP 429, "rate limit", "quota" errors
+- Decorator: `@rate_limit_retry`
+
+### Reporting
+
+Pytest plugin automatically generates:
+- CSV results with full metadata
+- Markdown summary with pass rates
+- Raw JSON for analysis
+
+Reports include:
+- Test execution details
+- Agent outputs
+- Grader results
+- Timing information
+- Failure reasons
+
+### Best Practices
+
+#### Agent Development
+
+- Keep instructions clear and concise
+- Use structured outputs (Pydantic models)
+- Tool calls should be explicit and traceable
+- Handle tool errors gracefully
+- Log important decisions
+
+#### Test Development
+
+- One test category per test function
+- Use parametrization for multiple scenarios
+- Mark async tests with `pytest.mark.asyncio`
+- Use fixtures for common setup
+- Clean up resources in teardown
+
+#### Documentation
+
+- Update README for user-facing changes
+- Document new test scenarios clearly
+- Include examples in docstrings
+- Keep AGENTS.md current with workflow changes
+
+## Troubleshooting
+
+**Import errors**: Run `uv sync`
+
+**API key missing**: Set `OPENAI_API_KEY` and `WORK_GEMINI_API_KEY`
+
+**Rate limits**: Reduce parallelism or increase retry delays
+
+**Report generation fails**: Check write permissions in `test_reports/`
+
+**Tests not discovered**: Ensure files match `test_*.py` pattern
+
+## Contributing
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for general guidelines.
+
+Project-specific considerations:
+- Test new features against adversarial scenarios
+- Maintain backwards compatibility with existing graders
+- Document breaking changes clearly
+- Run full test suite before submitting PRs

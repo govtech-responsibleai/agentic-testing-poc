@@ -1,24 +1,24 @@
 import json
-import os
 import logging
+import os
+from datetime import datetime
+from typing import Any, Dict, List, TypedDict
+
 import pandas as pd
-from tenacity import retry, stop_after_attempt, retry_if_exception_type
+from dotenv import find_dotenv, load_dotenv
+from langchain_core.exceptions import OutputParserException
+from langchain_core.output_parsers import JsonOutputParser
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, START, Graph
+from langgraph.prebuilt import create_react_agent
+from tenacity import retry, retry_if_exception_type, stop_after_attempt
 from tqdm.auto import tqdm
+
+from analysis.factchecking import FactCheckResult
 from analysis.llm_client import LLMClient
 from analysis.prompts import factcheck_with_search_agent_system_prompt
-from langgraph.graph import START, END, Graph
-from langgraph.prebuilt import create_react_agent
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.exceptions import OutputParserException
-from langgraph.checkpoint.memory import MemorySaver
-from datetime import datetime
-from typing import Dict, Any, List, TypedDict
-from analysis.factchecking import FactCheckResult
-from analysis.prompts import factcheck_with_search_agent_system_prompt
-
 from analysis.tools.ddg_tool import RetryDuckDuckGoSearchResults
 from analysis.tools.visit_page_tool import fetch_url_content
-from dotenv import load_dotenv, find_dotenv
 
 
 log_dir = "logs"
@@ -72,14 +72,14 @@ class FactCheckingAgent:
         }
 
     def _factuality_check_node(self, state: GraphState) -> GraphState:
-            """Check the factuality of claims using web search."""
-            factcheck_results = {}
-            
-            for claim in state["checkworthy_claims"]:
-                result = self._factuality_check(claim)
-                factcheck_results[claim] = result
-            
-            return {**state, "factcheck_results": factcheck_results}
+        """Check the factuality of claims using web search."""
+        factcheck_results = {}
+
+        for claim in state["checkworthy_claims"]:
+            result = self._factuality_check(claim)
+            factcheck_results[claim] = result
+
+        return {**state, "factcheck_results": factcheck_results}
 
     @retry(stop=stop_after_attempt(3), retry=retry_if_exception_type(OutputParserException))
     def _search_and_check(self, claim: str) -> Dict[str, Any]:
@@ -105,18 +105,15 @@ class FactCheckingAgent:
             config=config
         )
         all_messages = agent_result["messages"]
-            
 
         logger.info(f"Claim: {claim}")
         logger.info(all_messages)
         response = agent_result["messages"][-1]
-                    
+
         parser = JsonOutputParser(pydantic_object=FactCheckResult)
         result = parser.parse(response.content)
-                                
+
         return result
-        
-        
 
     def _factuality_check(self, claim: str) -> Dict[str, Any]:
         """Check the factuality of a single claim using web search."""
@@ -149,8 +146,8 @@ class FactCheckingAgent:
         """Generate a final comprehensive report of the fact checking process."""
         # Prepare the claims check data
         claims_check = []
-        
-        for claim in checkworthy_claims:            
+
+        for claim in checkworthy_claims:
             claim_data = {"check_type": "factuality"}
             if claim in factcheck_results:
                 claim_data["reasoning"] = factcheck_results[claim]["REASONING"]
@@ -162,18 +159,15 @@ class FactCheckingAgent:
             else:
                 claim_data["reasoning"] = ["No factuality check performed for this claim"]
                 claim_data["score"] = "NA"
-            
-                
+
             claims_check.append(claim_data)
-        
+
         # Compile the final report
         final_report = {
             "claims_check": claims_check
         }
-        
-        return final_report
-    
 
+        return final_report
 
     def run(self, checkworthy_claims: List[str]) -> Dict[str, Any]:
         """Run the fact checking workflow."""
@@ -183,6 +177,3 @@ class FactCheckingAgent:
             }
         })
         return result["final_output"]
-    
-
-

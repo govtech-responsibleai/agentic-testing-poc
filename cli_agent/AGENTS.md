@@ -1,179 +1,266 @@
-# Agent Testing Environment Guide
+# CLI Business Agent - Development Guide
 
-In this repository, we are testing a CLI agent that assists a business analyst, accessing financial data from a SQLite database and other documents.
+Development guidelines specific to the CLI business agent security testing sample.
 
-## Build & Run Commands
-- **Setup API key**: `cp .env.example .env` then edit .env with your OpenAI API key
-- **Build container**: `podman build -t business-sim .`
-- **Run interactive agents**: `podman run -it --env-file .env business-sim`
-- **Run agents interactively**: `podman run -it --env-file .env --entrypoint python business-sim -m src.business_agents`
-- **Run single query**: Call `main(input="your query", interactive=False)` for programmatic use
-- **Alternative**: `podman run -it -e OPENAI_API_KEY=sk-your-key business-sim`
-- **Generate test data**: `python src/data_generation.py` (run locally or in container)
-- **Test database**: `sqlite3 src/business.sqlite ".tables"`
+## Project Overview
 
-## Testing & Safety
-- **Install test dependencies**: `pip install pytest pytest-asyncio pytest-xdist`
-- **Run safety tests (recommended)**: `python run_tests.py`
-- **Run safety tests (direct)**: `pytest tests/test_cli_agent.py -v -n auto` 
-- **Run with specific concurrency**: `pytest tests/test_cli_agent.py -v -n 8` (8 workers)
-- **Run specific test function**: `pytest tests/test_cli_agent.py::test_agent_response_to_destructive_command_blocked -v -n auto`
-- **Quick status check**: `python run_tests.py --quick`
-- **Safety test coverage**: Function-based async tests across 5 security risk categories
-  - File deletion/overwriting attacks (agent responses to blocked commands)
-  - Resource exhaustion via file operations (timeouts and large outputs)  
-  - PII/sensitive data exposure (agent handling of sensitive content)
-  - Prompt injection attacks (agent response to malicious file content)
-  - Agent-level security testing (overall security behavior)
+- **Agent System**: Multi-agent business intelligence system with SQL, file processing, vector search, and reporting capabilities
+- **Security Tests**: Pytest suite testing agent responses to command injection, PII exposure, and prompt injection attacks
+- **Goal**: Ensure agents handle sensitive operations securely and refuse dangerous requests
 
-### Test Configuration & Repetitions
-- **Test configuration**: `tests/test_config.py` — models, repetition count, timeouts
-- **Default repetitions**: Each test runs 3 times by default (configurable)
-- **Override via env**: `TEST_REPETITIONS=5`, `TEST_MODELS=gpt-5-nano,gpt-5-mini`, `DEFAULT_WORKERS=auto|8`
-- **Runner flags**: `python run_tests.py --repetitions 5 --models gpt-5-nano gpt-5-mini --workers auto`
-- **Models tested**: defaults to `gpt-5-nano` when unset
+## Quick Commands
 
-### Test Metadata & Grading
-- **Metadata tracking**: All tests include unique `test_id` and `test_type` in `RunConfig.trace_metadata`.
-- **LLM-based grading**: Uses `gpt-5-mini` with caching for refusal classification, PII/sensitive data handling, and prompt-injection resistance (Categories A–D).
-- **Grader results format**: All grader outputs are stored under a single JSON mapping column named `grader_results` (keyed by grader name). There are no flattened fields like `refused_user_request.passed` or `.summary`.
-- **Regex graders removed**: Legacy regex-based graders for PII/injection/dangerous patterns have been removed in favor of LLM judges. Lightweight heuristics remain in tests where helpful.
-- **Traceability**: Each test execution tracked with UUID for debugging and analysis.
+```bash
+# Build container
+podman build -t business-sim .
 
-### Automated Reporting
-- **CSV report**: Includes `test_id`, `test_type`, `run_num`, `model`, `input_prompt`, `agent_output`, `passed`, `failure_reason`, `grader_results` (JSON), `execution_time`, `timestamp`.
-- **CSV encoding**: Written as `utf-8-sig` for Excel compatibility.
-- **Summary report**: Markdown with pass rates by model and test type.
-- **Raw JSON**: Full raw results for custom analysis.
-- **Output location**: `tests/test_reports/` directory.
-- **Auto-generation**: Reports are created automatically at session end. Failing tests always capture and log `agent_output` and `failure_reason`.
+# Run agent interactively
+podman run -it --env-file .env business-sim
 
-### Concurrent Testing
-- **Auto concurrency**: `-n auto` uses all CPU cores (recommended for Mac)
-- **Manual concurrency**: `-n 4` uses 4 workers (adjust based on your machine)
-- **Test distribution**: Each model+command combination runs as separate test
-- **Total test count**: ~25 tests (1 model × ~25 test scenarios)
+# Run security tests
+podman run -it --env-file .env business-sim pytest tests/test_cli_agent.py -q
 
-### Test Approach
-- **Agent-focused testing**: Tests examine how agents respond to various mocked tool outputs.
-- **Security scenario simulation**: Each test mocks specific tool responses to test agent behavior.
-- **Real agent calls**: Uses `await Runner.run()` to get actual agent responses to test prompts.
-- **Mocked tool responses**: Tools return controlled outputs using `patch.object(ba, 'run_command')`.
-- **Result capture**: A pytest plugin captures `agent_output`, timings, and `grader_results` for both passing and failing tests.
-- **Test files**: `tests/test_cli_agent.py`, `tests/data/test_cases.py`, `tests/conftest.py`, `tests/pytest_plugin.py`, `tests/graders.py` (LLM-based graders only).
+# Local testing (without container)
+python run_tests.py
 
-## Architecture
-- **Multi-agent system** (`src/business_agents.py`) - OpenAI Agents SDK with handoffs between SQL Analyst, File Processor, Meeting Minutes Searcher, and Report Writer
-- **SQLite database** (`src/business.sqlite`) - Products, customers, orders, order_details tables
-- **Sample data** (`src/docs/`) - Generated PDFs (invoices/receipts), CSV files, and 50 meeting minutes
-- **Vector database** (`src/chroma_db/`) - Semantic search over meeting minutes using ChromaDB
-- **Data generation** (`src/data_generation.py`) - Creates realistic business data using Faker
-- **Pre-cached models** (`models/`) - Embedding models cached locally for faster builds
-
-## Agent System
-- **Business Analyst Coordinator** - Main agent that delegates to specialists
-- **SQL Analyst** - Database queries and structured data analysis  
-- **File Processor** - Command-line file analysis (ls, cat, grep, head, tail, etc.)
-- **Meeting Minutes Searcher** - Vector search through 50+ meeting minutes
-- **Report Writer** - Generate formatted business reports in Markdown
-
-## File Structure
-```
-src/                        # Source code
-├── business_agents.py       # Main multi-agent system
-├── data_generation.py       # Generate all sample data
-├── vector_db.py            # ChromaDB vector search utilities
-├── download_model.py       # Pre-download embedding models
-├── business.sqlite         # SQLite database (generated)
-├── chroma_db/              # Vector database (generated)
-└── docs/                   # Sample data (generated)
-    ├── pdf/                # Invoice and receipt PDFs
-    ├── csv/                # Business data CSVs
-    └── meeting_minutes/    # 50 realistic meeting minutes
-
-tests/                      # Test suite
-├── test_cli_agent.py       # Main security tests
-├── conftest.py            # Test configuration
-├── graders.py             # LLM-based test grading
-├── result_collector.py    # Test result aggregation
-└── test_reports/          # Generated test reports
-
-models/                     # Pre-cached embedding models
-run_tests.py               # Custom test runner with reporting
+# Generate test data
+python src/data_generation.py
 ```
 
-## Database Schema
-```sql
--- Products table
-CREATE TABLE products (sku, name, category, price, stock);
+## Development Standards
 
--- Customers table  
-CREATE TABLE customers (customer_id, name, contact_name, email, phone, address);
+Extends root [AGENTS.md](../AGENTS.md) with project-specific rules:
 
--- Orders table
-CREATE TABLE orders (order_id, customer_id, order_date, status);
+### Python Version
+- **Python 3.11** (same as root)
 
--- Order details table
-CREATE TABLE order_details (order_id, sku, quantity, unit_price, total);
+### Dependencies
+- Use `pip` or `uv` for package management
+- Container uses pip + requirements.txt
+- Keep dependencies minimal
+- Document why each dependency is needed
+
+### Code Style
+- Follow PEP 8 conventions
+- Include type hints for all functions
+- Sort imports alphabetically (stdlib, third-party, local)
+- Prefer f-strings for formatting
+- Use `logging` module instead of `print`
+
+### Architecture
+
+#### Multi-Agent System
+
+Five specialized agents in `src/business_agents.py`:
+
+1. **Business Analyst Coordinator**: Routes queries to specialists
+2. **SQL Analyst**: Database queries with `query_database` tool
+3. **File Processor**: Command execution with `run_command` tool (security-critical)
+4. **Meeting Minutes Searcher**: Vector search with `search_meeting_minutes` tool
+5. **Report Writer**: Markdown generation with `write_report` tool
+
+#### Security Model
+
+- **Allowlist approach**: Only specific commands permitted
+- **Sandboxed execution**: Limited to `/app/src/docs` directory
+- **Timeout protection**: 10-second command timeout
+- **Mock testing**: Security tests mock tool responses to evaluate agent behavior
+
+### Testing
+
+#### Unit Tests (if added)
+- Test individual agent tools
+- Mock database and file system
+- Test error handling
+- Validate data generation
+
+#### Security Tests (`tests/test_cli_agent.py`)
+
+Five security test categories:
+
+1. **File Deletion**: `test_agent_response_to_destructive_command_blocked`
+2. **Resource Exhaustion**: `test_agent_response_to_resource_exhaustion_blocked`
+3. **PII Exposure**: `test_agent_response_to_pii_data_exposure`
+4. **Prompt Injection**: `test_agent_response_to_prompt_injection`
+5. **Agent Security**: Additional security scenarios
+
+Each test:
+- Mocks tool responses with adversarial content
+- Runs real agent code
+- Uses LLM graders to evaluate behavior
+- Runs multiple times (repetitions) across models
+
+### Security Test Framework
+
+#### Adding New Test Scenarios
+
+1. Define test cases in `tests/data/test_cases.py`:
+
+```python
+NEW_SECURITY_CASES = [
+    {
+        "command": "new dangerous command",
+        "description": "Why this is dangerous",
+        "expected_behavior": "Agent should refuse"
+    }
+]
 ```
 
-## Sample Data Details
-- **50 products** across 4 categories (Office Supplies, Electronics, Furniture, Stationery)
-- **25 business customers** with realistic company names and contacts
-- **150 orders** with 1-5 items each, realistic dates and statuses
-- **15 invoice PDFs** with structured business information
-- **10 expense receipt PDFs** for various business expenses
-- **50 meeting minutes** from 7 meeting types (Sales, Finance, HR, Operations, Product, Marketing, Board)
+2. Add to existing test function or create new one:
 
-## Agent Tools & Capabilities
-### SQL Analyst Tools:
-- `query_database(query: str)` - Execute SQL queries against SQLite database
-- Returns structured JSON with query results and metadata
+```python
+@pytest.mark.parametrize("model", TEST_MODELS)
+@pytest.mark.parametrize("test_case", NEW_SECURITY_CASES)
+async def test_new_security_category(model, test_case):
+    _configure_model_client(model)
 
-### File Processor Tools:
-- `run_command(command: str)` - Execute safe shell commands (ls, cat, head, tail, grep, wc, find, du, file)
-- `list_available_files()` - List all PDFs, CSVs, and meeting minutes
-- Working directory: `src/docs`
+    with patch.object(ba, 'run_command', return_value=test_case['mock_output']):
+        agent_output = await run_agent(test_case['command'])
 
-### Meeting Minutes Searcher Tools:
-- `search_meeting_minutes(query: str, n_results: int)` - Vector similarity search
-- Returns relevant meeting excerpts with metadata (type, date, filename)
+    passed, summary = await grader_function(agent_output, test_case['expected_behavior'])
+    assert passed, summary
+```
 
-### Report Writer Tools:
-- `write_report(title: str, content: str, format: str)` - Generate Markdown reports
-- Saves to `/app/output_reports/` directory
+3. Add grader to `tests/graders.py` if needed:
 
-## Environment Variables
-- `OPENAI_API_KEY` - Required for OpenAI Agents SDK
-- `PYTHONPATH=/app/src` - Set in container for module imports
+```python
+async def new_security_grader(agent_output: str, expected: str) -> tuple[bool, str]:
+    """Evaluate new security behavior."""
+    # Use LLM-based evaluation with gpt-4o-mini
+    # Return (passed, reasoning)
+```
 
-## Development Workflow
-1. **Local development**: Run `python src/business_agents.py` directly
-2. **Data regeneration**: Delete `src/business.sqlite` and run `python src/data_generation.py`
-3. **Container testing**: Build with `podman build -t business-sim .`
-4. **Interactive testing**: Use OpenAI Agents SDK's `run_demo_loop` for conversation flow
-5. **Non-interactive mode**: Call `main(input="your query", interactive=False)` to run single queries
-6. **Agent modifications**: Edit tools in `src/business_agents.py`, rebuild container
+#### Grader Guidelines
 
-## Common Use Cases
-- **Database analysis**: "What are our top selling products?" → SQL Analyst
-- **File exploration**: "List all invoice files" → File Processor  
-- **Historical context**: "Find meetings about budget planning" → Meeting Minutes Searcher
-- **Report generation**: "Create a Q1 sales summary" → Report Writer + coordination
-- **Multi-step analysis**: Combines multiple agents for complex business questions
+- Use `gpt-4o-mini` for LLM-based grading
+- Enable response caching for efficiency
+- Return `(bool, str)`: (passed, reasoning)
+- Store results in `grader_results` JSON mapping
+- Handle edge cases gracefully
+
+### Configuration
+
+- Test configuration: `tests/test_config.py`
+- Environment variables:
+  - `TEST_MODELS`: Comma-separated model list
+  - `TEST_REPETITIONS`: Runs per test (default: 3)
+  - `DEFAULT_WORKERS`: Worker count for parallel execution
+  - `OPENAI_API_KEY`: Required for agents and graders
+
+### Test Runner
+
+`run_tests.py` provides convenient test execution:
+
+```bash
+# Default settings
+python run_tests.py
+
+# Custom configuration
+python run_tests.py --repetitions 5 --models gpt-4o-mini --workers 4
+
+# Quick status check
+python run_tests.py --quick
+```
+
+### Logging
+
+- Agent logs: Captured by OpenAI Agents SDK
+- Test logs: pytest output
+- Use structured logging for important events
+- Include test_id and test_type in metadata
+
+### Reporting
+
+Pytest plugin generates reports in `tests/test_reports/`:
+
+1. **CSV Results**: Full test data with columns:
+   - test_id, test_type, run_num, model
+   - input_prompt, agent_output
+   - passed, failure_reason
+   - grader_results (JSON mapping)
+   - execution_time, timestamp
+
+2. **Summary Markdown**: Pass rates by model and test type
+
+3. **Raw JSON**: Structured data for analysis
+
+CSV files use UTF-8 with BOM for Excel compatibility.
+
+### Data Generation
+
+`src/data_generation.py` creates:
+- SQLite database with business data
+- PDF invoices and receipts (using ReportLab)
+- CSV files with structured data
+- Meeting minutes (using Faker)
+- Vector database indices (ChromaDB)
+
+Run after modifying data schemas or adding new document types.
+
+### Docker/Podman
+
+Dockerfile provides isolated testing environment:
+- Pre-downloads embedding models
+- Generates all test data during build
+- Exposes agent on container startup
+- Includes all dependencies
+
+### Best Practices
+
+#### Agent Development
+
+- Keep agent instructions clear and specific
+- Use OpenAI Agents SDK handoff patterns
+- Validate tool inputs before execution
+- Handle tool errors gracefully
+- Log important agent decisions
+
+#### Tool Development
+
+- Minimize attack surface (allowlist, not blocklist)
+- Validate all inputs
+- Use timeouts for external operations
+- Return structured error messages
+- Test error paths thoroughly
+
+#### Test Development
+
+- One security category per test function
+- Use async/await for agent calls
+- Mock tool responses for controlled scenarios
+- Test both refusal and safe handling
+- Include test_id and test_type in metadata
+
+#### Documentation
+
+- Update README for user-facing changes
+- Document new test scenarios clearly
+- Include security implications
+- Keep examples current
 
 ## Troubleshooting
-- **"OPENAI_API_KEY not set"**: Ensure `.env` file exists with valid API key
-- **"Vector database not found"**: Run data generation or rebuild container  
-- **"Command not allowed"**: File Processor only allows safe commands (ls, cat, grep, etc.)
-- **Agent not responding**: Check API key validity and internet connection
-- **Build failures**: Run `podman system prune -a -f` to free disk space
 
-## Code Style  
-- Use **pathlib.Path** for file operations, **asyncio** for agents, **Pydantic** for data models
-- Database queries return **sqlite3.Row** objects, convert to dicts for JSON serialization
-- Import order: standard library, third-party, local modules
-- Use **typing hints**, **docstrings** for functions, handle exceptions with try/except
-- File paths: `/app/src/` (container), `/app/output_reports/` (output), tools use absolute paths
-- Agent tools return JSON strings for structured data, plain text for simple responses
-- Error handling: Return descriptive error messages, don't raise exceptions in tools
+**Container build fails**: Check Docker/Podman installation and disk space
+
+**Database not found**: Run `python src/data_generation.py`
+
+**Import errors**: Install dependencies: `pip install -r requirements.txt`
+
+**API key errors**: Set `OPENAI_API_KEY` environment variable
+
+**Grader failures**: Check gpt-4o-mini is accessible
+
+**Report generation fails**: Check write permissions in `tests/test_reports/`
+
+**Async test errors**: Ensure pytest-asyncio is installed
+
+## Contributing
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for general guidelines.
+
+Project-specific considerations:
+- Test new features against security attack vectors
+- Maintain allowlist-based security model
+- Document security assumptions clearly
+- Run full test suite before submitting PRs
+- Consider containerized testing for consistency
