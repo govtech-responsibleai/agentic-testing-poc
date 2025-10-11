@@ -1,19 +1,20 @@
-"""
-Multi-agent system for business data analysis using OpenAI Agents SDK
-"""
+"""Multi-agent system for business data analysis using OpenAI Agents SDK."""
 
-from agents import Agent, Runner, function_tool, SQLiteSession
-from openai.types.responses import ResponseTextDeltaEvent
-from pathlib import Path
-import builtins
-import sqlite3
-import json
-from typing import Dict, Any, List
-from pydantic import BaseModel
+from __future__ import annotations
+
 import asyncio
-import inspect
+import builtins
+import json
+import logging
+import sqlite3
 import uuid
-from vector_db import VectorDB
+from pathlib import Path
+from typing import Any
+
+from openai.types.responses import ResponseTextDeltaEvent
+from pydantic import BaseModel
+
+from agents import Agent, Runner, SQLiteSession, function_tool
 
 # Database connection
 DB_PATH = Path(__file__).parent / "business.sqlite"
@@ -21,9 +22,12 @@ DOCS_DIR = Path(__file__).parent / "docs"
 REPORTS_DIR = Path("/app/output_reports")
 
 
+logger = logging.getLogger(__name__)
+
+
 class QueryResult(BaseModel):
     query: str
-    results: List[Dict[str, Any]]
+    results: list[dict[str, Any]]
     row_count: int
 
 
@@ -31,7 +35,7 @@ class FileAnalysis(BaseModel):
     filename: str
     file_type: str
     summary: str
-    key_data: Dict[str, Any]
+    key_data: dict[str, Any]
 
 
 class ReportRequest(BaseModel):
@@ -45,7 +49,7 @@ class ReportRequest(BaseModel):
 
 @function_tool
 def query_database(query: str) -> str:
-    """Execute SQL query against the business database"""
+    """Execute a SQL query against the business database."""
     try:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
@@ -64,7 +68,7 @@ def query_database(query: str) -> str:
 
 @function_tool
 def run_command(command: str) -> str:
-    """Execute shell command and return output"""
+    """Execute a shell command and return the captured output."""
     import subprocess
 
     try:
@@ -82,6 +86,7 @@ def run_command(command: str) -> str:
         ]
         cmd_parts = command.split()
         if not cmd_parts or cmd_parts[0] not in safe_commands:
+            logger.warning("Rejected unsafe command: %s", command)
             return f"Command not allowed. Allowed commands: {', '.join(safe_commands)}"
 
         result = subprocess.run(
@@ -100,14 +105,16 @@ def run_command(command: str) -> str:
         return output if output else "Command executed successfully (no output)"
 
     except subprocess.TimeoutExpired:
+        logger.error("Command timed out: %s", command)
         return "Command timed out"
     except Exception as e:
+        logger.exception("Command execution error")
         return f"Command execution error: {str(e)}"
 
 
 @function_tool
 def write_report(title: str, content: str, format: str = "markdown") -> str:
-    """Write a report to the reports directory"""
+    """Write the provided content to the reports directory."""
     try:
         REPORTS_DIR.mkdir(exist_ok=True)
 
@@ -129,7 +136,7 @@ def write_report(title: str, content: str, format: str = "markdown") -> str:
 
 @function_tool
 def search_meeting_minutes(query: str, n_results: int = 5) -> str:
-    """Search meeting minutes using vector similarity"""
+    """Search meeting minutes using vector similarity."""
     try:
         import chromadb
 
@@ -182,7 +189,7 @@ def search_meeting_minutes(query: str, n_results: int = 5) -> str:
 
 @function_tool
 def list_available_files() -> str:
-    """List all available files and directories for analysis"""
+    """List all available files and directories for analysis."""
     try:
         files = {"pdfs": [], "csvs": [], "meeting_minutes": []}
 
@@ -206,8 +213,10 @@ def list_available_files() -> str:
 # ============= AGENTS =============
 
 
-def create_agents(model_name: str):
-    """Create all agents with the specified model"""
+def create_agents(model_name: str) -> Agent:
+    """Create the coordinator agent wired with all specialist handoffs."""
+
+    logger.info("Initialising business agents with model %s", model_name)
     # SQL Agent - handles database queries
     sql_agent = Agent(
         name="SQL Analyst",
@@ -326,8 +335,8 @@ def create_agents(model_name: str):
 # ============= MAIN INTERFACE =============
 
 
-async def _simple_interactive_loop(agent, max_turns: int = 20) -> None:
-    """Fallback interactive loop using Runner.run without the SDK demo helper."""
+async def _simple_interactive_loop(agent: Agent, max_turns: int = 20) -> None:
+    """Fallback interactive loop using `Runner.run` without the SDK demo helper."""
     turns = 0
     while turns < max_turns:
         try:
@@ -345,8 +354,8 @@ async def _simple_interactive_loop(agent, max_turns: int = 20) -> None:
         turns += 1
 
 
-async def main(input: str = None, interactive: bool = True):
-    """Main interface - runs interactive demo loop or single query"""
+async def main(input: str | None = None, interactive: bool = True) -> None:
+    """Run the interactive demo loop or handle a single query."""
 
     print("🏢 Business Analytics Agent System")
     print("Ask questions about business data, request reports, or analyze files.")
@@ -394,6 +403,9 @@ async def main(input: str = None, interactive: bool = True):
     # Create session instance with unique conversation ID
     conversation_id = str(uuid.uuid4())
     session = SQLiteSession(conversation_id)
+    logger.info(
+        "Starting session %s in %s mode", conversation_id, "interactive" if interactive else "batch"
+    )
     print(f"Session ID: {conversation_id}")
 
     if interactive:

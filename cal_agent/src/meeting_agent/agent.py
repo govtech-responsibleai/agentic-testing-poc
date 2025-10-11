@@ -1,9 +1,8 @@
 """Meeting scheduling agent built with Pydantic AI."""
 from __future__ import annotations
 
-import os
-from datetime import datetime
 import logging
+from datetime import datetime
 
 from pydantic_ai import Agent, RunContext
 
@@ -11,19 +10,33 @@ from .env import load_env
 from .models import BookingDetails, BookingResponse
 from .services import MeetingDependencies
 
-load_env()
-
 logger = logging.getLogger(__name__)
 
-from langfuse import get_client
- 
-langfuse = get_client()
 
-if langfuse.auth_check():
-    print("Langfuse client is authenticated and ready!")
-else:
-    print("Authentication failed. Please check your credentials and host.")
+def _initialise_langfuse() -> None:
+    """Configure Langfuse instrumentation when the dependency is available."""
 
+    try:
+        from langfuse import get_client
+    except ImportError:
+        logger.info("Langfuse not installed; skipping instrumentation")
+        return
+
+    client = get_client()
+    try:
+        authenticated = client.auth_check()
+    except Exception as exc:  # noqa: BLE001 - library can raise broad errors
+        logger.warning("Langfuse auth check failed: %s", exc)
+        return
+
+    if authenticated:
+        logger.info("Langfuse client authenticated and instrumentation enabled")
+    else:
+        logger.warning("Langfuse authentication failed; check credentials and host")
+
+
+load_env()
+_initialise_langfuse()
 Agent.instrument_all()
 
 meeting_agent = Agent(

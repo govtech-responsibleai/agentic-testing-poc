@@ -1,20 +1,41 @@
 #!/usr/bin/env python3
-"""
-CLI Agent Safety Test Runner
+"""CLI Agent safety test runner with optional report generation."""
 
-This script runs the safety tests and generates comprehensive reports.
-"""
+from __future__ import annotations
 
 import argparse
+import logging
+import os
 import subprocess
 import sys
-from pathlib import Path
 
-from tests.test_config import TEST_MODELS, TEST_REPETITIONS, DEFAULT_WORKERS
 from tests.result_collector import generate_all_reports
+from tests.test_config import DEFAULT_WORKERS, TEST_MODELS, TEST_REPETITIONS
 
 
-def main():
+logger = logging.getLogger(__name__)
+
+
+def _build_pytest_command(args: argparse.Namespace) -> list[str]:
+    """Construct the pytest command based on CLI options."""
+
+    cmd = ["python", "-m", "pytest", f"tests/{args.test_pattern}"]
+    if args.verbose and not args.quick:
+        cmd.append("-v")
+    elif args.quick:
+        cmd.extend(["--tb=no", "-q"])
+    else:
+        cmd.append("-v")
+
+    if args.workers != "1":
+        cmd.extend(["-n", str(args.workers)])
+
+    return cmd
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Parse arguments, execute pytest, and optionally generate reports."""
+
     parser = argparse.ArgumentParser(
         description="Run CLI agent safety tests and generate reports"
     )
@@ -48,65 +69,43 @@ def main():
         "--no-reports", action="store_true", help="Skip report generation"
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
-    # Build pytest command
-    cmd = ["python", "-m", "pytest", f"tests/{args.test_pattern}"]
-
-    # Add verbosity
-    if args.verbose and not args.quick:
-        cmd.append("-v")
-    elif args.quick:
-        cmd.extend(["--tb=no", "-q"])
-    else:
-        cmd.append("-v")
-
-    # Add workers for parallel execution
-    if args.workers != "1":
-        cmd.extend(["-n", str(args.workers)])
-
-    # Set environment variables for test configuration
-    import os
-
+    cmd = _build_pytest_command(args)
     env = os.environ.copy()
     env["TEST_MODELS"] = ",".join(args.models)
     env["TEST_REPETITIONS"] = str(args.repetitions)
 
-    print(f"Running CLI agent safety tests...")
-    print(f"Models: {args.models}")
-    print(f"Repetitions per test: {args.repetitions}")
-    print(f"Workers: {args.workers}")
-    print(f"Command: {' '.join(cmd)}")
-    print("-" * 60)
+    logger.info("Running CLI agent safety tests")
+    logger.info("Models: %s", args.models)
+    logger.info("Repetitions per test: %s", args.repetitions)
+    logger.info("Workers: %s", args.workers)
+    logger.info("Command: %s", " ".join(cmd))
 
     try:
-        # Run the tests
         result = subprocess.run(cmd, env=env, check=False)
-
-        print("-" * 60)
-        print(f"Tests completed with exit code: {result.returncode}")
+        logger.info("Tests completed with exit code %s", result.returncode)
 
         if not args.no_reports:
-            print("\nGenerating reports...")
+            logger.info("Generating reports...")
             try:
                 paths = generate_all_reports()
-                print("✓ Reports generated successfully!")
-                print("  Files created:")
                 for report_type, path in paths.items():
-                    print(f"    {report_type.upper()}: {path}")
-            except Exception as e:
-                print(f"✗ Error generating reports: {e}")
+                    logger.info("%s report generated at %s", report_type.upper(), path)
+            except Exception:  # noqa: BLE001 - surfaced to user via log
+                logger.exception("Error generating reports")
                 return 1
 
         return result.returncode
 
     except KeyboardInterrupt:
-        print("\nTest execution interrupted by user")
+        logger.warning("Test execution interrupted by user")
         return 1
-    except Exception as e:
-        print(f"Error running tests: {e}")
+    except Exception:  # noqa: BLE001 - surface unexpected errors
+        logger.exception("Unexpected error running tests")
         return 1
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     sys.exit(main())
