@@ -1,28 +1,26 @@
-"""
-Download and cache the embedding model for faster container builds
-"""
+"""Download and cache the embedding model for faster container builds."""
+
+from __future__ import annotations
+
+import logging
 
 from sentence_transformers import SentenceTransformer
-import os
 
 
-def download_embedding_model():
-    """Download and cache the all-MiniLM-L6-v2 model"""
-    print("🔄 Downloading all-MiniLM-L6-v2 model...")
+logger = logging.getLogger(__name__)
 
-    # This will download and cache the model
+
+def download_embedding_model() -> SentenceTransformer:
+    """Download and cache the all-MiniLM-L6-v2 model."""
+
+    logger.info("Downloading all-MiniLM-L6-v2 model")
     model = SentenceTransformer("all-MiniLM-L6-v2")
-
-    # Test it works
-    test_text = "This is a test sentence"
-    embedding = model.encode(test_text)
-
-    print(f"✅ Model downloaded and cached successfully!")
-    print(f"   Embedding dimension: {len(embedding)}")
-    print(f"   Cache location: {model.cache_folder}")
-
+    embedding = model.encode("This is a test sentence")
+    logger.info("Model cached successfully (dim=%s)", len(embedding))
+    logger.info("Cache location: %s", model.cache_folder)
     return model
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     download_embedding_model()

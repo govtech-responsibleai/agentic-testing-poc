@@ -11,3 +11,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_PATH = PROJECT_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
+
+
+pytest_plugins = [
+    "cal_agent.tests.agentic_testing.pytest_plugin",
+    "cal_agent.tests.agentic_testing.data.test_cases",
+]

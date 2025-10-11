@@ -1,18 +1,30 @@
-"""
-Generate realistic meeting minutes for the business simulation
-"""
+"""Generate realistic meeting minutes for the business simulation."""
+
+from __future__ import annotations
+
+import logging
+import random
+from datetime import timedelta
+from pathlib import Path
+from typing import Iterable
 
 from faker import Faker
-import random
-from datetime import datetime, timedelta
-from pathlib import Path
 
 DOCS_DIR = Path(__file__).parent / "docs"
 MINUTES_DIR = DOCS_DIR / "meeting_minutes"
 
+logger = logging.getLogger(__name__)
 
-def generate_meeting_minutes():
-    """Generate 50 realistic meeting minutes documents"""
+
+def _write_minutes(filepath: Path, lines: Iterable[str]) -> None:
+    """Persist meeting minutes content to disk."""
+
+    filepath.write_text("\n".join(lines), encoding="utf-8")
+
+
+def generate_meeting_minutes(total_documents: int = 50) -> None:
+    """Generate realistic meeting minutes documents into the docs directory."""
+
     fake = Faker()
     MINUTES_DIR.mkdir(exist_ok=True)
 
@@ -113,7 +125,7 @@ def generate_meeting_minutes():
         "digital transformation",
     ]
 
-    for i in range(50):
+    for i in range(total_documents):
         # Choose meeting type and related topics
         meeting_type = random.choice(list(meeting_types.keys()))
         topics = meeting_types[meeting_type]
@@ -201,13 +213,14 @@ def generate_meeting_minutes():
         filename = f"meeting_{i+1:02d}_{meeting_type.lower().replace(' ', '_')}_{meeting_date.strftime('%Y%m%d')}.md"
         filepath = MINUTES_DIR / filename
 
-        with open(filepath, "w") as f:
-            f.write("\n".join(content))
+        _write_minutes(filepath, content)
+        logger.info("Generated meeting minutes: %s", filename)
 
-        print(f"Generated: {filename}")
-
-    print(f"\n✅ Generated 50 meeting minutes in {MINUTES_DIR}")
+    logger.info(
+        "Generated %s meeting minutes in %s", total_documents, MINUTES_DIR
+    )
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     generate_meeting_minutes()

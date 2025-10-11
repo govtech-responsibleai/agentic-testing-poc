@@ -1,58 +1,55 @@
-"""
-Vector database setup using Chroma for meeting minutes and document search
-"""
+"""Vector database setup using Chroma for meeting minutes and document search."""
+
+from __future__ import annotations
+
+import logging
+import uuid
+from pathlib import Path
+from typing import Any
 
 import chromadb
-from chromadb.config import Settings
-from pathlib import Path
-import json
-from typing import List, Dict, Any
-import uuid
 
 # Paths
 DOCS_DIR = Path(__file__).parent / "docs"
 MINUTES_DIR = DOCS_DIR / "meeting_minutes"
 CHROMA_DIR = Path(__file__).parent / "chroma_db"
 
+logger = logging.getLogger(__name__)
+
 
 class VectorDB:
-    def __init__(self, persist_directory: str = None):
-        """Initialize Chroma vector database"""
+    """Wrapper around a persistent Chroma collection."""
+
+    def __init__(self, persist_directory: str | None = None) -> None:
         if persist_directory is None:
             persist_directory = str(CHROMA_DIR)
 
-        # Create Chroma client with persistence
         self.client = chromadb.PersistentClient(path=persist_directory)
-
-        # Create or get collection
         self.collection = self.client.get_or_create_collection(
             name="business_documents", metadata={"hnsw:space": "cosine"}
         )
 
-    def add_meeting_minutes(self):
-        """Load and index all meeting minutes"""
+    def add_meeting_minutes(self) -> None:
+        """Load and index all meeting minutes located in the docs directory."""
+
         if not MINUTES_DIR.exists():
-            print(f"Meeting minutes directory not found: {MINUTES_DIR}")
+            logger.warning("Meeting minutes directory not found: %s", MINUTES_DIR)
             return
 
-        documents = []
-        metadatas = []
-        ids = []
+        documents: list[str] = []
+        metadatas: list[dict[str, str]] = []
+        ids: list[str] = []
 
         for file_path in MINUTES_DIR.glob("*.md"):
-            with open(file_path, "r") as f:
-                content = f.read()
-
-            # Extract metadata from filename and content
+            content = file_path.read_text(encoding="utf-8")
             filename = file_path.name
             parts = filename.split("_")
             meeting_num = parts[1]
             meeting_type = "_".join(parts[2:-1])
-            date_str = parts[-1].replace(".md", "")
+            date_str = parts[-1].removesuffix(".md")
 
-            # Parse basic info from content
-            lines = content.split("\n")
-            meeting_title = lines[0].replace("# ", "") if lines else "Unknown Meeting"
+            lines = content.splitlines()
+            meeting_title = lines[0].removeprefix("# ") if lines else "Unknown Meeting"
 
             metadata = {
                 "filename": filename,
@@ -67,65 +64,71 @@ class VectorDB:
             metadatas.append(metadata)
             ids.append(str(uuid.uuid4()))
 
-        # Add to collection
-        if documents:
-            self.collection.add(documents=documents, metadatas=metadatas, ids=ids)
-            print(f"✅ Added {len(documents)} meeting minutes to vector database")
-        else:
-            print("❌ No meeting minutes found to add")
+        if not documents:
+            logger.info("No meeting minutes found to add to vector database")
+            return
+
+        self.collection.add(documents=documents, metadatas=metadatas, ids=ids)
+        logger.info("Added %s meeting minutes to vector database", len(documents))
 
     def search_documents(
-        self, query: str, n_results: int = 5, doc_type: str = None
-    ) -> List[Dict[str, Any]]:
-        """Search for similar documents"""
-        where_filter = {}
+        self, query: str, n_results: int = 5, doc_type: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Search for similar documents using semantic similarity."""
+
+        where_filter: dict[str, str] | None = None
         if doc_type:
-            where_filter["document_type"] = doc_type
+            where_filter = {"document_type": doc_type}
 
         results = self.collection.query(
             query_texts=[query],
             n_results=n_results,
-            where=where_filter if where_filter else None,
+            where=where_filter,
         )
 
-        # Format results
-        formatted_results = []
-        for i in range(len(results["documents"][0])):
+        formatted_results: list[dict[str, Any]] = []
+        for index, document in enumerate(results["documents"][0]):
             formatted_results.append(
                 {
-                    "content": results["documents"][0][i],
-                    "metadata": results["metadatas"][0][i],
+                    "content": document,
+                    "metadata": results["metadatas"][0][index],
                     "similarity": (
-                        results["distances"][0][i] if "distances" in results else None
+                        results["distances"][0][index]
+                        if "distances" in results
+                        else None
                     ),
                 }
             )
 
         return formatted_results
 
-    def get_collection_info(self) -> Dict[str, Any]:
-        """Get information about the collection"""
+    def get_collection_info(self) -> dict[str, Any]:
+        """Return simple metadata about the managed collection."""
+
         count = self.collection.count()
         return {"total_documents": count, "collection_name": self.collection.name}
 
     def search_by_meeting_type(
         self, meeting_type: str, n_results: int = 5
-    ) -> List[Dict[str, Any]]:
-        """Search for documents by meeting type"""
+    ) -> list[dict[str, Any]]:
+        """Search for documents filtered by meeting type."""
+
         results = self.collection.query(
             query_texts=[meeting_type],
             n_results=n_results,
             where={"document_type": "meeting_minutes"},
         )
 
-        formatted_results = []
-        for i in range(len(results["documents"][0])):
+        formatted_results: list[dict[str, Any]] = []
+        for index, document in enumerate(results["documents"][0]):
             formatted_results.append(
                 {
-                    "content": results["documents"][0][i],
-                    "metadata": results["metadatas"][0][i],
+                    "content": document,
+                    "metadata": results["metadatas"][0][index],
                     "similarity": (
-                        results["distances"][0][i] if "distances" in results else None
+                        results["distances"][0][index]
+                        if "distances" in results
+                        else None
                     ),
                 }
             )
@@ -133,46 +136,43 @@ class VectorDB:
         return formatted_results
 
 
-def initialize_vector_db():
-    """Initialize vector database with meeting minutes"""
-    print("🔄 Initializing vector database...")
+def initialize_vector_db() -> VectorDB:
+    """Initialise the vector database with meeting minutes content."""
 
-    # Create vector DB instance
+    logger.info("Initialising vector database")
     vector_db = VectorDB()
-
-    # Add meeting minutes
     vector_db.add_meeting_minutes()
-
-    # Print collection info
     info = vector_db.get_collection_info()
-    print(f"📊 Vector database initialized: {info['total_documents']} documents")
-
+    logger.info(
+        "Vector database initialised with %s documents", info.get("total_documents", 0)
+    )
     return vector_db
 
 
-def search_meeting_minutes(query: str, n_results: int = 5):
-    """Convenience function to search meeting minutes"""
+def search_meeting_minutes(query: str, n_results: int = 5) -> list[dict[str, Any]]:
+    """Convenience helper to search meeting minutes and log the results."""
+
     vector_db = VectorDB()
     results = vector_db.search_documents(query, n_results, doc_type="meeting_minutes")
 
-    print(f"🔍 Search results for '{query}':")
-    for i, result in enumerate(results, 1):
+    for index, result in enumerate(results, 1):
         metadata = result["metadata"]
-        print(f"\n{i}. {metadata['title']} ({metadata['meeting_type']})")
-        print(f"   Date: {metadata['date']}, File: {metadata['filename']}")
-        print(f"   Preview: {result['content'][:200]}...")
+        logger.info(
+            "%s. %s (%s) - %s",
+            index,
+            metadata.get("title"),
+            metadata.get("meeting_type"),
+            metadata.get("filename"),
+        )
+    return results
 
 
 if __name__ == "__main__":
-    # Initialize the vector database
-    db = initialize_vector_db()
-
-    # Example searches
-    print("\n" + "=" * 50)
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    initialize_vector_db()
+    logger.info("%s", "=" * 50)
     search_meeting_minutes("sales performance and revenue", 3)
-
-    print("\n" + "=" * 50)
+    logger.info("%s", "=" * 50)
     search_meeting_minutes("product development and roadmap", 3)
-
-    print("\n" + "=" * 50)
+    logger.info("%s", "=" * 50)
     search_meeting_minutes("budget and financial planning", 3)
