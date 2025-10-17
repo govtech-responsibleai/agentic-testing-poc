@@ -1,10 +1,11 @@
 """Meeting scheduling agent built with Pydantic AI."""
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime
-import logging
 
+from langfuse import get_client
 from pydantic_ai import Agent, RunContext
 
 from .env import load_env
@@ -15,14 +16,12 @@ load_env()
 
 logger = logging.getLogger(__name__)
 
-from langfuse import get_client
- 
 langfuse = get_client()
 
 if langfuse.auth_check():
-    print("Langfuse client is authenticated and ready!")
+    logger.info("Langfuse client is authenticated and ready!")
 else:
-    print("Authentication failed. Please check your credentials and host.")
+    logger.warning("Langfuse authentication failed. Please check your credentials and host.")
 
 Agent.instrument_all()
 

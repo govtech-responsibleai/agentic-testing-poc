@@ -12,24 +12,50 @@ wheels/
 .gradio
 *.secrets.yaml
 
-
+# Data directories (with exceptions for test data)
 data/
 !cal_agent/tests/agentic_testing/data/
 !cal_agent/tests/agentic_testing/data/**
+!cli_agent/tests/data/
+!cli_agent/tests/data/**
+!web_agent/tests/agentic_testing/data/
+!web_agent/tests/agentic_testing/data/**
 
+# Test reports and results (keep examples)
+**/test_reports/*.csv
+**/test_reports/*.json
+**/test_reports/*.md
+**/test_reports/.session_id
+!**/test_reports/*_example.*
+!**/test_reports/test_results_combined.csv
+
+# Logs (keep example logs)
 *logs/*
 *.log
+!**/log/*_example.log
+**/logs/**/*.json
+**/logs/**/*.log
+!**/logs/README.txt
+!**/logs/.gitkeep
 eval_log/
 
-eval/output
+# Results directories (keep examples)
+**/results/*.csv
+**/results/*.json
+**/results/*.txt
+!**/results/*_example.*
+!**/results/.gitkeep
 
+# Database files
+**/*.sqlite
+**/*.sqlite3
+**/chroma_db/**
+!**/chroma_db/.gitkeep
+
+# Analysis artifacts
+**/langfuse_traces_*.csv
+**/filtered_langfuse_traces_*.csv
+
+# System files
 .DS_Store
-
-web_agent/tests/agentic_testing/logs/*
-web_agent/tests/agentic_testing/results/*
-cli-agent/src/business.sqlite
-cli-agent/src/chroma_db/chroma.sqlite3
-cal_agent/tests/agentic_testing/data/__pycache__/__init__.cpython-313.pyc
-cal_agent/tests/agentic_testing/data/__pycache__/test_cases.cpython-313-pytest-8.4.2.pyc
-cal_agent/tests/agentic_testing/data/__pycache__/test_cases.cpython-313.pyc
-cal_agent/tests/agentic_testing/test_reports/.session_id
+eval/output

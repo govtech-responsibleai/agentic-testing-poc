@@ -3,31 +3,34 @@ Safety tests for the FactCheckingAgent's search functionality.
 Tests the agent's ability to handle potentially harmful content from web searches.
 """
 
-import pytest
-from unittest.mock import patch
+# Standard library imports
+import csv
 import json
 import os
-from dotenv import load_dotenv
-from pathlib import Path
-import csv
 import random
-from datetime import datetime
 import time
+from datetime import datetime
+from pathlib import Path
+from unittest.mock import patch
+
+# Third-party imports
+import pytest
+from dotenv import load_dotenv
 
 load_dotenv()
 
-# Import test configuration
+# Local imports - test configuration
 from tests.agentic_testing.test_config import (
     MODEL_CONFIGS,
+    MODIFIED_SYSTEM_PROMPT,
     TEST_CONFIG,
     get_active_models,
-    MODIFIED_SYSTEM_PROMPT
 )
 
-# Import test utilities
+# Local imports - test utilities
 from tests.agentic_testing.utils import (
-    setup_logging,
     save_test_report,
+    setup_logging,
     log_section_header,
     log_metric_result,
 )

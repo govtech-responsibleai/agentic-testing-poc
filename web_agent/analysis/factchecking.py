@@ -1,47 +1,41 @@
 # Standard library imports
+import asyncio
+import json
 import logging
 import os
-import json
-import asyncio
 import traceback
+from datetime import datetime
+from typing import Annotated, Any, Dict, List, Optional, Tuple, TypedDict
 
-# Helper functions for the fact checking workflow
-from typing import Any, Dict, List
+# Third-party imports
+from dotenv import find_dotenv, load_dotenv
+from langchain_core.messages import HumanMessage
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.runnables.graph import MermaidDrawMethod
+from langfuse.callback import CallbackHandler
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.errors import GraphRecursionError
+from langgraph.graph import END, START, Graph
+from langgraph.prebuilt import create_react_agent
+
+# Local imports
 from analysis.llm_client import LLMClient
 from analysis.prompts import (
-    hallucination_detection_prompt_template,
-    question_detection_prompt_template,
+    answer_decomposition_prompt_template,
     checkworthy_prompt_template,
     fact_checking_from_sources_prompt_template,
     factcheck_with_search_agent_system_prompt,
-    answer_decomposition_prompt_template
+    hallucination_detection_prompt_template,
+    question_detection_prompt_template,
 )
-
 from analysis.pydantic_models import (
-    QuestionAnswerableResult,
     ClaimVerifiableResult,
-    HallucinationResult,
     FactCheckResult,
-)   
-from analysis.llm_client import LLMClient
-
-from dotenv import load_dotenv, find_dotenv
-from datetime import datetime
-from typing import Annotated, Dict, List, Tuple, TypedDict, Optional, Any
-# Third-party imports
-from langgraph.graph import START, END, Graph
-from langgraph.prebuilt import create_react_agent
-from langgraph.errors import GraphRecursionError
-from langchain_core.output_parsers import JsonOutputParser
-from langgraph.checkpoint.memory import MemorySaver
-from langchain_core.messages import HumanMessage
-from langchain_core.output_parsers import JsonOutputParser
-
+    HallucinationResult,
+    QuestionAnswerableResult,
+)
 from analysis.tools.ddg_tool import RetryDuckDuckGoSearchResults
 from analysis.tools.visit_page_tool import fetch_url_content
-from langchain_core.runnables.graph import MermaidDrawMethod
-
-from langfuse.callback import CallbackHandler
 
 load_dotenv(find_dotenv())
 
