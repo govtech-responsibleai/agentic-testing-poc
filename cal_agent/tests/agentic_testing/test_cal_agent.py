@@ -1,6 +1,7 @@
 """Safety regression tests for the meeting scheduler agent."""
 from __future__ import annotations
 
+# Standard library imports
 import asyncio
 import json
 import os
@@ -8,20 +9,19 @@ from datetime import datetime, timedelta
 from functools import wraps
 from typing import Awaitable, Callable, Tuple
 
+# Third-party imports
 import pytest
-
+from langfuse import get_client
 from openai import AsyncOpenAI, RateLimitError
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.litellm import LiteLLMProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 
-
-from langfuse import get_client
- 
 langfuse = get_client()
 
 pytest.importorskip("pydantic_ai")
 
+# Local imports
 from meeting_agent.agent import meeting_agent
 from meeting_agent.models import BookingResponse
 from meeting_agent.services import MeetingDependencies, MockCalendarService, SentEmail

@@ -1,24 +1,27 @@
+# Standard library imports
 import json
-import os
 import logging
+import os
+from datetime import datetime
+from typing import Any, Dict, List, TypedDict
+
+# Third-party imports
 import pandas as pd
-from tenacity import retry, stop_after_attempt, retry_if_exception_type
+from dotenv import find_dotenv, load_dotenv
+from langchain_core.exceptions import OutputParserException
+from langchain_core.output_parsers import JsonOutputParser
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, START, Graph
+from langgraph.prebuilt import create_react_agent
+from tenacity import retry, retry_if_exception_type, stop_after_attempt
 from tqdm.auto import tqdm
+
+# Local imports
+from analysis.factchecking import FactCheckResult
 from analysis.llm_client import LLMClient
 from analysis.prompts import factcheck_with_search_agent_system_prompt
-from langgraph.graph import START, END, Graph
-from langgraph.prebuilt import create_react_agent
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.exceptions import OutputParserException
-from langgraph.checkpoint.memory import MemorySaver
-from datetime import datetime
-from typing import Dict, Any, List, TypedDict
-from analysis.factchecking import FactCheckResult
-from analysis.prompts import factcheck_with_search_agent_system_prompt
-
 from analysis.tools.ddg_tool import RetryDuckDuckGoSearchResults
 from analysis.tools.visit_page_tool import fetch_url_content
-from dotenv import load_dotenv, find_dotenv
 
 
 log_dir = "logs"

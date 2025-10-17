@@ -2,17 +2,22 @@
 Multi-agent system for business data analysis using OpenAI Agents SDK
 """
 
-from agents import Agent, Runner, function_tool, SQLiteSession
-from openai.types.responses import ResponseTextDeltaEvent
-from pathlib import Path
-import builtins
-import sqlite3
-import json
-from typing import Dict, Any, List
-from pydantic import BaseModel
+# Standard library imports
 import asyncio
+import builtins
 import inspect
+import json
+import sqlite3
 import uuid
+from pathlib import Path
+from typing import Any, Dict, List
+
+# Third-party imports
+from agents import Agent, Runner, SQLiteSession, function_tool
+from openai.types.responses import ResponseTextDeltaEvent
+from pydantic import BaseModel
+
+# Local imports
 from vector_db import VectorDB
 
 # Database connection
