@@ -20,6 +20,12 @@ data/
 !cli_agent/tests/data/**
 !web_agent/tests/agentic_testing/data/
 !web_agent/tests/agentic_testing/data/**
+cal_agent/tests/agentic_testing/data/**/__pycache__/
+cal_agent/tests/agentic_testing/data/**/*.py[oc]
+cli_agent/tests/data/**/__pycache__/
+cli_agent/tests/data/**/*.py[oc]
+web_agent/tests/agentic_testing/data/**/__pycache__/
+web_agent/tests/agentic_testing/data/**/*.py[oc]
 
 # Test reports and results (keep examples)
 **/test_reports/*.csv
